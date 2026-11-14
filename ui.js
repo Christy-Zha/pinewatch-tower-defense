@@ -77,7 +77,7 @@
     if(["build","upgrade","start","cleared","leak","won","lost"].includes(e))sound.play(e);
     if(e==="won"){P.settle(profile,g);save();outcome();return}if(e==="lost"){save();outcome();return}
     if(e==="leak")msg("敌军突破城门");
-    if(e==="cleared")msg("击退第 "+g.wave+" 波　+"+(20+g.wave*3)+" 军费");
+    if(e==="cleared")msg("击退第 "+g.wave+" 波　+"+PineGame.waveReward(g.wave)+" 军费");
     if(e==="kill"||e==="leak")return;
     save();update();
   }
@@ -88,7 +88,13 @@
     pane.append(btn("拆除 · 回收 "+Math.floor(t.spent*.65)+" 军费","secondary",()=>{const i=selected;selected=null;g.sell(i);manageKey="";update()}));
   }
   function intel(){const n=Math.min(stage.waves,g.phase==="ready"?g.wave+1:Math.max(1,g.wave)),key=n+"/"+profile.chapter;if(intelKey===key)return;intelKey=key;$("intel-wave").textContent="WAVE "+fmt(n);const counts=stage.lineup[n-1],type=["boss","brute","runner","scout"].find(t=>counts[t]),row=make("div","intel-row");art(type,row,true);
-    const d=make("div");d.innerHTML="<strong>"+units[type].name+" ×"+counts[type]+"</strong><p>"+Object.entries(counts).filter(([k])=>k!==type).map(([k,v])=>units[k].name+" ×"+v).join(" · ")+"</p>";if(!d.lastChild.textContent)d.lastChild.textContent=units[type].hint;row.append(d,btn("查看模型","textbtn inspect-unit",()=>inspect(type)));$("intel-body").replaceChildren(row)}
+    const formation=stage.formations[n-1];
+    const reports={pack:["狼群突袭","疾狼将在队伍中段成群冲刺。箭塔守后段，寒霜塔卡弯道。"],vanguard:["铁甲先遣","铁甲兵打头阵。用炮塔穿甲，或先用寒霜破甲再集火。"],escort:["领主护送","重甲卫队先行，领主随后入场。留出一段冰炮交叉火力。"],mixed:["混编推进",units[type].hint]};
+    const [name,hint]=reports[formation];
+    $("intel-wave").textContent="第 "+n+" 波 · "+name;
+    const d=make("div"),title=make("strong"),list=make("p"),tip=make("p");
+    title.textContent=units[type].name+" ×"+counts[type];list.textContent=Object.entries(counts).filter(([k])=>k!==type).map(([k,v])=>units[k].name+" ×"+v).join(" · ");tip.textContent=hint;
+    d.append(title);if(list.textContent)d.append(list);d.append(tip);row.append(d,btn("查看模型","textbtn inspect-unit",()=>inspect(type)));$("intel-body").replaceChildren(row)}
   const handButtons=cardIds.map(id=>{const b=make("button","hand-card "+id);b.dataset.card=id;b.innerHTML='<i data-icon="'+items[id].sigil+'"></i><span>'+items[id].name+'</span><small></small>';b.title=items[id].desc;
     b.onclick=()=>{if(!P.use(profile,g,id))return;save();update();dirty=true;sound.play("card");msg(items[id].name+" 已生效");$("map-area").animate?.([{filter:"brightness(1.3)"},{filter:"brightness(1)"}],{duration:330})};$("hand").append(b);return b});
   function update(){

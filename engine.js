@@ -3,12 +3,12 @@
   const towers={
     arrow:{name:"游侠箭塔",brief:"单体 · 快速射击",cost:60,range:65,damage:13,delay:.66,description:"射速最快，优先攻击最接近城门的敌人。"},
     cannon:{name:"重装炮塔",brief:"范围 · 爆炸伤害",cost:90,range:59,damage:31,delay:1.95,description:"炮弹对命中点周围 22 格内的敌人造成范围伤害。"},
-    frost:{name:"寒霜法塔",brief:"控制 · 冰霜减速",cost:75,range:57,damage:7,delay:.88,description:"命中的敌人减速 45%，持续 2 秒。"}
+    frost:{name:"寒霜法塔",brief:"控制 · 冻裂护甲",cost:75,range:57,damage:7,delay:.88,description:"命中后减速 45%，持续 2 秒。受寒或冻结时，重甲敌人的箭伤减免失效。"}
   };
   const units={
-    scout:{name:"林地斥候",hint:"轻装步兵，成群沿山道前进。",hp:32,speed:23,bounty:5,leak:1},
-    runner:{name:"赤鬃疾狼",hint:"移动迅速，寒霜减速可延缓突袭。",hp:30,speed:35,bounty:6,leak:1},
-    brute:{name:"铁甲兽人",hint:"生命较高，适合用火炮集中打击。",hp:92,speed:18,bounty:11,leak:2},
+    scout:{name:"林地斥候",hint:"轻装步兵，成群沿山道前进。",hp:32,speed:26,bounty:3,leak:1},
+    runner:{name:"赤鬃疾狼",hint:"耐受炮火，受到的炮击伤害降低 40%。用箭塔截击。",hp:30,speed:41,bounty:5,leak:1},
+    brute:{name:"铁甲兽人",hint:"护甲抵消 55% 箭伤。炮击可穿甲，寒霜可冻裂护甲。",hp:92,speed:19,bounty:10,leak:2},
     boss:{name:"赤岩领主",hint:"重甲首领，突破城门将扣除 8 点生命。",hp:600,speed:16,bounty:50,leak:8}
   };
   const waves=[
@@ -18,6 +18,11 @@
   ];
   const levelStats=(type,level)=>{const t=towers[type];return {range:t.range+(level-1)*5,damage:Math.round(t.damage*(1+.65*(level-1))),delay:t.delay/(1+.12*(level-1))}};
   const upgradeCost=t=>Math.round(towers[t.type].cost*(t.level===1?.8:1.2));
+  const waveReward=wave=>15+wave*2;
+  function arrowDamage(enemy,damage){
+    const armored=enemy.type==="brute"||enemy.type==="boss";
+    return armored&&!enemy.slow&&!enemy.frozen?damage*.45:damage;
+  }
   class Battle {
     constructor(path,pads,onEvent=()=>{},stage=null){
       this.path=path;this.pads=pads;this.onEvent=onEvent;this.stage=stage;this.waves=stage?.lineup||waves;this.sections=[];this.length=0;
@@ -35,16 +40,25 @@
       if(this.phase!=="ready"||this.paused)return false;
       const counts={...this.waves[this.wave]};this.wave++;this.phase="fight";this.queue=[];this.defeated=0;
       const boss=counts.boss||0;delete counts.boss;
+      const formation=this.stage?.formations?.[this.wave-1];
+      const wolves=formation==="pack"?counts.runner:0;
+      if(wolves)delete counts.runner;
+      if(formation==="vanguard"||formation==="escort"){
+        const front=Math.ceil((counts.brute||0)/2);
+        for(let i=0;i<front;i++)this.queue.push("brute");
+        counts.brute-=front;
+      }
       while(Object.values(counts).some(n=>n>0))for(const type of Object.keys(counts))if(counts[type]>0){this.queue.push(type);counts[type]--}
       for(let b=0;b<boss;b++)this.queue.splice(Math.floor(this.queue.length*(.45+.30*b)),0,"boss");
+      if(wolves)this.queue.splice(Math.floor(this.queue.length*.45),0,...Array(wolves).fill("runner"));
       this.waveSize=this.queue.length;this.spawnIn=.3;this.onEvent("start");return true;
     }
     burst(x,y,color,n){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,speed=5+Math.random()*19;this.particles.push({x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed-8,color,ttl:.25+Math.random()*.2})}}
     fire(i,t,target,stats){
       const [x,y]=this.pads[i],type=t.type;
       t.yaw=Math.atan2(target.x-x,target.y-y);this.shots.push({x,y,tx:target.x,ty:target.y,type,ttl:.29,max:.29});
-      if(type==="cannon"){for(const e of this.enemies){if(Math.hypot(e.x-target.x,e.y-target.y)<=22)e.hp-=stats.damage}this.burst(target.x,target.y-3,"#ffc272",9)}
-      else{target.hp-=stats.damage;if(type==="frost"){target.slow=2;this.burst(target.x,target.y-3,"#ade6f0",4)}}
+      if(type==="cannon"){for(const e of this.enemies){if(Math.hypot(e.x-target.x,e.y-target.y)<=22)e.hp-=stats.damage*(e.type==="runner"?.6:1)}this.burst(target.x,target.y-3,"#ffc272",9)}
+      else{target.hp-=type==="arrow"?arrowDamage(target,stats.damage):stats.damage;if(type==="frost"){target.slow=2;this.burst(target.x,target.y-3,"#ade6f0",4)}}
       this.onEvent("shot",type);
     }
     aimRanger(dt){
@@ -59,7 +73,7 @@
       if(target)r.yaw=Math.atan2(target.x-r.x,target.y-r.z);
       r.cycle+=dt/1.9;
       if(!r.released&&r.cycle>=.65&&target){
-        r.released=true;target.hp-=9;
+        r.released=true;target.hp-=arrowDamage(target,9);
         // The projectile centre starts on the drawn shaft as the string releases.
         const side=-1.15,forward=5.0,cos=Math.cos(r.yaw),sin=Math.sin(r.yaw);
         this.shots.push({x:r.x+side*cos+forward*sin,y:r.z+forward*cos-side*sin,tx:target.x,ty:target.y,type:"ranger",ttl:.36,max:.36});
@@ -70,7 +84,12 @@
     step(dt){
       if(this.paused||this.phase!=="fight")return;
       this.time+=dt;this.spawnIn-=dt;
-      if(this.queue.length&&this.spawnIn<=0){const type=this.queue.shift(),u=units[type],hp=Math.round(u.hp*(this.stage?.hp||1)*(1+(this.wave-1)*.215));this.enemies.push({id:++this.serial,type,hp,maxHp:hp,d:0,slow:0,frozen:0,...this.point(0)});this.spawnIn+=Math.max(.54,1.05-this.wave*.041)*(this.stage?.rate||1)}
+      if(this.queue.length&&this.spawnIn<=0){
+        const type=this.queue.shift(),u=units[type],hp=Math.round(u.hp*(this.stage?.hp||1)*(1+(this.wave-1)*.215));
+        this.enemies.push({id:++this.serial,type,hp,maxHp:hp,d:0,slow:0,frozen:0,...this.point(0)});
+        const pack=this.stage?.formations?.[this.wave-1]==="pack"&&type==="runner"&&this.queue[0]==="runner";
+        this.spawnIn+=Math.max(.54,1.05-this.wave*.041)*(this.stage?.rate||1)*(pack ? .5 : 1);
+      }
       for(const e of this.enemies){e.slow=Math.max(0,e.slow-dt);e.frozen=Math.max(0,(e.frozen||0)-dt);if(!e.frozen)e.d+=units[e.type].speed*(e.slow>0?.55:1)*dt;Object.assign(e,this.point(e.d))}
       this.aimRanger(dt);
       for(let i=0;i<this.towers.length;i++){const t=this.towers[i];if(!t)continue;t.cd=Math.max(0,t.cd-dt);if(t.cd>0)continue;
@@ -87,10 +106,10 @@
       if(this.health<=0){this.phase="lost";this.onEvent("lost")}
       else if(!this.enemies.length&&!this.queue.length){
         this.shots=[];this.particles=[];this.phase=this.wave===this.waves.length?"won":"ready";
-        if(this.phase==="ready")this.gold+=20+this.wave*3;
+        if(this.phase==="ready")this.gold+=waveReward(this.wave);
         this.onEvent(this.phase==="won"?"won":"cleared");
       }
     }
   }
-  window.PineGame={Battle,towers,units,waves,levelStats,upgradeCost};
+  window.PineGame={Battle,towers,units,waves,levelStats,upgradeCost,waveReward};
 })();
