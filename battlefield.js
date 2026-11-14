@@ -36,6 +36,11 @@
   function setExpanded(on){
     if(on)expand.before(sound);else utilities.prepend(sound);
     document.documentElement.classList.toggle('battle-expanded',on);
+    const wide=on&&landscapePhone.matches;
+    if(document.documentElement.classList.contains('phone-battle')!==wide){
+      document.documentElement.classList.toggle('phone-battle',wide);
+      window.dispatchEvent(new Event('pine-field-layout'));
+    }
     for(const region of outside)region.inert=on;
     expand.setAttribute('aria-pressed',String(on));
     expand.querySelector('span').textContent=on?'退出全屏':'全屏';
@@ -60,7 +65,7 @@
   });
   window.addEventListener('pine-native-screen',nativeScreen);
   document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&inBattleView())setExpanded(false)});
-  landscapePhone.addEventListener('change',e=>{if(e.matches)setExpanded(true)});
+  landscapePhone.addEventListener('change',e=>{if(e.matches||inBattleView())setExpanded(e.matches)});
   if(landscapePhone.matches)setExpanded(true);
   document.getElementById('cam-zoom-in').addEventListener('click',()=>zoom(factor));
   document.getElementById('cam-zoom-out').addEventListener('click',()=>zoom(1/factor));

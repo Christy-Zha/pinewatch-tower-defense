@@ -120,7 +120,7 @@
   function setup(restore=false){
     stage=chapters[profile.chapter];g=new Battle(stage.path,stage.pads,onEvent,stage);
     if(!restore||!P.restore(profile,g)){g.towers[1]={type:"arrow",level:1,spent:0,cd:0};profile.run=null}
-    choice="arrow";selected=hover=null;clock=0;stamp=0;intelKey=manageKey="";renderer.resetCamera();$("frontline").setAttribute("aria-pressed","false");renderer.set(stage,profile.chapter,profile.skin);installPads();
+    choice="arrow";selected=hover=null;clock=0;stamp=0;intelKey=manageKey="";renderer.set(stage,profile.chapter,profile.skin);renderer.resetCamera();$("frontline").setAttribute("aria-pressed","false");installPads();
     $("chapter-title").textContent=stage.name;$("chapter-count").textContent="第 "+chapterNo()+" 章 / 共 "+chapters.length+" 章";$("mission").textContent=stage.mission;$("region").textContent=stage.region;
     $("story-label").textContent="第 "+chapterNo()+" 章 · 战地手记";$("story-title").textContent=stage.subtitle;$("story").textContent=stage.brief;$("wave-max").textContent=" / "+stage.waves;
     update();draw();save();if(restore&&g.ended)outcome();
@@ -209,6 +209,10 @@
     hover=null;lastProjection="";dirty=true;
   }
   window.addEventListener("pine-camera-zoom",event=>zoomMap(Number(event.detail)));
+  window.addEventListener("pine-field-layout",()=>{
+    renderer.set(stage,profile.chapter,profile.skin);renderer.resetCamera();frontline.setAttribute("aria-pressed","false");
+    lastProjection="";dirty=true;draw();
+  });
   function closeDialog(){if($("dialog").open)$("dialog").close();modal="";stamp=0;dirty=true;update()}
   function dialog(kind,label,title,html="",actions=[]){
     modal=kind;const d=$("dialog");d.dataset.kind=kind;$("dialog-label").textContent=label;$("dialog-title").textContent=title;$("dialog-body").innerHTML=html;$("dialog-actions").replaceChildren();

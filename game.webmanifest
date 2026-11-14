@@ -1,0 +1,13 @@
+{
+  "id": "./",
+  "name": "松境守卫",
+  "short_name": "松境守卫",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#182720",
+  "theme_color": "#182720",
+  "icons": [{"src": "assets/watch-icon.png", "sizes": "512x512", "type": "image/png"}]
+}

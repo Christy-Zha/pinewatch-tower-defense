@@ -68,11 +68,23 @@
     }
     release(o){if(o?.buf)this.gl.deleteBuffer(o.buf)}
     set(stage,index,skin){
-      if(this.stage===stage&&this.skin===skin)return;const m=new Mesh();PineScenery.build(m,stage,index,skin);this.release(this.staticData);this.staticData=this.data(m);this.stage=stage;this.skin=skin;this.softwareCache=null;this.dirty=true;
+      const wide=this.canvas.id==="field"&&document.documentElement.classList.contains("phone-battle");
+      if(this.stage===stage&&this.skin===skin&&this.wide===wide)return;
+      const m=new Mesh();PineScenery.build(m,stage,index,skin,wide);this.release(this.staticData);this.staticData=this.data(m);
+      this.stage=stage;this.skin=skin;this.wide=wide;this.softwareCache=null;this.dirty=true;
+      if(wide){
+        const points=[...stage.path,...stage.pads,...stage.supplies.map(c=>[c.x,c.z]),stage.post];
+        const xs=points.map(p=>p[0]),zs=points.map(p=>p[1]);
+        this.frameBounds=[Math.min(...xs)-14,Math.max(...xs)+14,Math.min(...zs)-8,Math.max(...zs)+8];
+      }
     }
     resetCamera(){
       const portrait=this.canvas.id==="field"&&window.matchMedia("(max-width:600px) and (orientation:portrait)").matches;
       this.angle=portrait ? -1.43 : -.34;this.pitch=portrait ? .92 : .69;this.zoom=1;this.center=[240,5,142];this.viewHeight=0;this.frontline=false;this.dirty=true;
+      if(this.wide&&this.frameBounds){
+        const [l,r,t,b]=this.frameBounds;
+        this.angle=0;this.pitch=1.08;this.center=[(l+r)/2,9,(t+b)/2];
+      }
     }
     follow(ranger){this.frontline=true;this.center=[ranger.x,13,ranger.z];this.viewHeight=66;this.pitch=.37;this.angle=-.65;this.dirty=true}
     camera(){
@@ -82,6 +94,12 @@
       this.ca=Math.cos(this.angle);this.sa=Math.sin(this.angle);this.cp=Math.cos(this.pitch);this.sp=Math.sin(this.pitch);
       const width=Math.abs(this.ca)*468+Math.abs(this.sa)*266,deep=Math.abs(this.sa)*468+Math.abs(this.ca)*266;
       this.scale=this.viewHeight?h/this.viewHeight:Math.min(w/(width+4),h/(deep*this.sp+52*this.cp+4))*this.zoom;
+      if(this.wide&&!this.viewHeight){
+        const [l,r,t,b]=this.frameBounds,dx=r-l,dz=b-t;
+        const spanX=Math.abs(this.ca)*dx+Math.abs(this.sa)*dz;
+        const spanY=(Math.abs(this.sa)*dx+Math.abs(this.ca)*dz)*this.sp+30*this.cp;
+        this.scale=Math.min(w/spanX,(h-Math.min(h*.23,76*dpr))/spanY)*this.zoom;
+      }
       this.w=w;this.h=h;this.offset=this.viewHeight?.50:.51;this.dpr=dpr;
     }
     project(x,y,z){

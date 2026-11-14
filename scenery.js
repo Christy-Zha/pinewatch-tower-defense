@@ -12,7 +12,7 @@
     for(const off of [16,8,0])n|=Math.round(((aa>>off)&255)*(1-k)+((bb>>off)&255)*k)<<off;
     return '#'+(n>>>0).toString(16).padStart(6,'0');
   }
-  function build(m,stage,index=0,skin='pine') {
+  function build(m,stage,index=0,skin='pine',continuous=false) {
     let seed=(4723921+index*84387)>>>0;
     index=stage.province?.scenery??index;
     const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
@@ -43,12 +43,13 @@
     }
     const dist2=(x,z,p)=>(p[0]-x)**2+(p[1]-z)**2;
     // A triangulated cap with a scalloped outline. Only boundary nodes move in height.
-    const nx=18,nz=11,grid=[],rim=[];
+    const margin=continuous?360:0;
+    const nx=continuous?42:18,nz=continuous?35:11,grid=[],rim=[];
     for(let j=0;j<=nz;j++){
       const row=[];
       for(let i=0;i<=nx;i++){
         const edge=i===0||j===0||i===nx||j===nz;
-        let x=x0+(x1-x0)*i/nx+between(-4,4), z=z0+(z1-z0)*j/nz+between(-3.5,3.5);
+        let x=x0-margin+(x1-x0+2*margin)*i/nx+between(-4,4), z=z0-margin+(z1-z0+2*margin)*j/nz+between(-3.5,3.5);
         if((j===0||j===nz)&&(i===0||i===nx)){x+=i===0?10:-10;z+=j===0?8:-8;}
         row.push([x,edge?between(-.6,-.1):between(-.16,0),z]);
       }
@@ -61,22 +62,24 @@
       if((j+i)%2){face([a,d,b],tone(between(-.08,.16)));face([b,d,c],tone(between(-.08,.16)));}
       else{face([a,d,c],tone(between(-.08,.16)));face([a,c,b],tone(between(-.08,.16)));}
     }
-    for(let i=0;i<=nx;i++)rim.push(grid[0][i]);
-    for(let j=1;j<=nz;j++)rim.push(grid[j][nx]);
-    for(let i=nx-1;i>=0;i--)rim.push(grid[nz][i]);
-    for(let j=nz-1;j>0;j--)rim.push(grid[j][0]);
-    const band=(depth,offset,colorJitter)=>rim.map(([x,,z])=>{
-      const dx=(x-(x1+x0)/2)/(x1-x0),dz=(z-(z0+z1)/2)/(z1-z0);
-      return [x+dx*offset+between(-1.6,1.6),-depth+between(-colorJitter,colorJitter),z+dz*offset+between(-1.6,1.6)];
-    });
-    const rings=[rim,band(3,2,.6),band(9,-1,1.8),band(16,1,2.4),band(26,-11,3.9)];
-    const strata=[moss,blend(P.soil,rock,.14),blend(P.soil,rock,.57),B(rock,.28)];
-    for(let j=0;j<strata.length;j++)for(let i=0;i<rim.length;i++){
-      const next=(i+1)%rim.length, a=rings[j][i],b=rings[j][next],c=rings[j+1][next],d=rings[j+1][i];
-      face([a,b,c],blend(strata[j],B(strata[j],.39),between(0,.65)));
-      face([a,c,d],blend(strata[j],L(strata[j],.30),between(0,.60)));
+    if(!continuous){
+      for(let i=0;i<=nx;i++)rim.push(grid[0][i]);
+      for(let j=1;j<=nz;j++)rim.push(grid[j][nx]);
+      for(let i=nx-1;i>=0;i--)rim.push(grid[nz][i]);
+      for(let j=nz-1;j>0;j--)rim.push(grid[j][0]);
+      const band=(depth,offset,colorJitter)=>rim.map(([x,,z])=>{
+        const dx=(x-(x1+x0)/2)/(x1-x0),dz=(z-(z0+z1)/2)/(z1-z0);
+        return [x+dx*offset+between(-1.6,1.6),-depth+between(-colorJitter,colorJitter),z+dz*offset+between(-1.6,1.6)];
+      });
+      const rings=[rim,band(3,2,.6),band(9,-1,1.8),band(16,1,2.4),band(26,-11,3.9)];
+      const strata=[moss,blend(P.soil,rock,.14),blend(P.soil,rock,.57),B(rock,.28)];
+      for(let j=0;j<strata.length;j++)for(let i=0;i<rim.length;i++){
+        const next=(i+1)%rim.length, a=rings[j][i],b=rings[j][next],c=rings[j+1][next],d=rings[j+1][i];
+        face([a,b,c],blend(strata[j],B(strata[j],.39),between(0,.65)));
+        face([a,c,d],blend(strata[j],L(strata[j],.30),between(0,.60)));
+      }
+      face(rings[rings.length-1],rockShade);
     }
-    face(rings[rings.length-1],rockShade);
 
     // The creek is arranged along one trail crossing in the first third of the map.
     const streamX=Math.max(x0+55,Math.min(x1-70,entry[0]+(end[0]>entry[0]?65:-65)));
@@ -109,6 +112,11 @@
       }
     }
     if(streamClear){
+      if(continuous){
+        const [sx,sz]=brook[0],[ex,ez]=brook.at(-1);
+        brook.unshift([sx-21,sz-margin],[sx+9,sz-70]);
+        brook.push([ex-12,ez+70],[ex+28,ez+margin]);
+      }
       ribbon(brook,6.1,.20,blend(P.soil,rock,.60));
       ribbon(brook,5.35,.32,blend(P.water,rock,.38));
       ribbon(brook,4.8,.41,i=>blend(P.water,'#9edcbb',.07+(i%4)*.045));
@@ -118,21 +126,28 @@
         if(distance(rx,rz,trail)>11)face([[rx,.48,rz-2.1],[rx+.7,.48,rz],[rx,.48,rz+2.7],[rx-.45,.48,rz]],L(P.water,.57));
       }
       // Water spills over the front lip of the rock pedestal in three translucent-looking ribbons.
-      const [wx]=brook[brook.length-1];
-      let lipZ=z1;
-      const bottom=grid[nz];
-      for(let i=1;i<bottom.length;i++)if(wx>=bottom[i-1][0]&&wx<=bottom[i][0]){
-        const t=(wx-bottom[i-1][0])/(bottom[i][0]-bottom[i-1][0]);
-        lipZ=bottom[i-1][2]*(1-t)+bottom[i][2]*t;
-      }
-      const waterEnd=brook[brook.length-1][1];
-      face([[wx-4.6,.48,waterEnd],[wx-4.4,.45,lipZ+1.5],[wx+4.5,.45,lipZ+1.5],[wx+4.65,.48,waterEnd]],P.water);
-      for(const [off,w,shade,depth] of [[-4.4,2.8,.12,19],[-1.6,4,.47,23],[2.4,2.2,.23,18]]){
-        face([[wx+off,.45,lipZ+1.5],[wx+off+w,.45,lipZ+1.5],
-          [wx+off+w-.6,-depth,lipZ+2.8],[wx+off+.1,-depth-1,lipZ+2.6]],L(P.water,shade));
+      if(!continuous){
+        const [wx]=brook[brook.length-1];
+        let lipZ=z1;
+        const bottom=grid[nz];
+        for(let i=1;i<bottom.length;i++)if(wx>=bottom[i-1][0]&&wx<=bottom[i][0]){
+          const t=(wx-bottom[i-1][0])/(bottom[i][0]-bottom[i-1][0]);
+          lipZ=bottom[i-1][2]*(1-t)+bottom[i][2]*t;
+        }
+        const waterEnd=brook[brook.length-1][1];
+        face([[wx-4.6,.48,waterEnd],[wx-4.4,.45,lipZ+1.5],[wx+4.5,.45,lipZ+1.5],[wx+4.65,.48,waterEnd]],P.water);
+        for(const [off,w,shade,depth] of [[-4.4,2.8,.12,19],[-1.6,4,.47,23],[2.4,2.2,.23,18]]){
+          face([[wx+off,.45,lipZ+1.5],[wx+off+w,.45,lipZ+1.5],
+            [wx+off+w-.6,-depth,lipZ+2.8],[wx+off+.1,-depth-1,lipZ+2.6]],L(P.water,shade));
+        }
       }
     }
     const trailW=8.25;
+    if(continuous){
+      const approach=[[x0-margin,entry[1]+20],[x0-60,entry[1]],entry];
+      ribbon(approach,trailW+1.5,.55,blend(P.road,P.soil,.54));
+      ribbon(approach,trailW,.68,P.road);
+    }
     ribbon(trail,trailW+1.5,.55,blend(P.road,P.soil,.54));
     ribbon(trail,i=>trailW+(i%3)*.15,.68,i=>blend(P.road,L(P.road,.28),.09*(i%4)));
     // Road stones show the trail's direction without covering it in repeated tiles.
