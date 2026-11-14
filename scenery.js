@@ -27,7 +27,7 @@
     const rock=P.rock, moss=B(P.grass,.14), rockShade=B(rock,.45), stone=L(blend(rock,'#cbd1bc',.4),.23);
     const timber=blend(P.soil,'#9e6943',.64),bark=B(timber,.35);
     const grass=blend(P.grass,P.grass2,.2),entry=trail[0],end=trail[trail.length-1];
-    const padPoints=pads.map(p=>Array.isArray(p)?p:[p.x,p.z]);
+    const padPoints=pads.map(p=>Array.isArray(p)?p:[p.x,p.z]).concat((stage.supplies||[]).map(c=>[c.x,c.z]));
     const xs=trail.map(p=>p[0]),zs=trail.map(p=>p[1]);
     const x0=Math.min(10,Math.min(...xs)-5),x1=Math.max(470,Math.max(...xs)+13);
     const z0=Math.min(14,Math.min(...zs)-10),z1=Math.max(270,Math.max(...zs)+8);

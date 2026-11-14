@@ -25,15 +25,21 @@
   }
   class Battle {
     constructor(path,pads,onEvent=()=>{},stage=null){
-      this.path=path;this.pads=pads;this.onEvent=onEvent;this.stage=stage;this.waves=stage?.lineup||waves;this.sections=[];this.length=0;
+      this.path=path;this.baseSites=pads.length;this.supplies=stage?.supplies||[];
+      this.pads=pads.concat(this.supplies.map(c=>[c.x,c.z]));this.onEvent=onEvent;this.stage=stage;this.waves=stage?.lineup||waves;this.sections=[];this.length=0;
       for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i],len=Math.hypot(b[0]-a[0],b[1]-a[1]);if(!len)continue;this.sections.push({a,b,len,start:this.length});this.length+=len}
       const post=this.point(Math.min(67,this.length*.12));
       this.post=stage?.post||[post.x+Math.cos(post.yaw)*13,post.y-Math.sin(post.yaw)*13];this.reset();
     }
-    reset(){this.gold=this.stage?.gold??180;this.health=20;this.wave=0;this.kills=0;this.phase="ready";this.paused=false;this.speed=1;this.towers=this.pads.map(()=>null);this.enemies=[];this.shots=[];this.particles=[];this.queue=[];this.spawnIn=0;this.time=0;this.defeated=0;this.serial=0;this.waveSize=0;this.ranger={x:this.post[0],z:this.post[1],yaw:-.25,target:null,cycle:0,released:false}}
+    reset(){this.supplyHealth=this.supplies.map(c=>c.hp);this.markedSupply=null;this.gold=this.stage?.gold??180;this.health=20;this.wave=0;this.kills=0;this.phase="ready";this.paused=false;this.speed=1;this.towers=this.pads.map(()=>null);this.enemies=[];this.shots=[];this.particles=[];this.queue=[];this.spawnIn=0;this.time=0;this.defeated=0;this.serial=0;this.waveSize=0;this.ranger={x:this.post[0],z:this.post[1],yaw:-.25,target:null,cycle:0,released:false}}
     get ended(){return this.phase==="won"||this.phase==="lost"}
+    get clearedSupplies(){return this.supplyHealth.filter(hp=>hp===0).length}
+    markSupply(j){
+      if(this.ended||!this.supplyHealth[j])return false;
+      this.markedSupply=this.markedSupply===j?null:j;return true;
+    }
     point(d){const s=this.sections.find(v=>d<v.start+v.len)||this.sections[this.sections.length-1];const t=Math.max(0,Math.min(1,(d-s.start)/s.len));return {x:s.a[0]+(s.b[0]-s.a[0])*t,y:s.a[1]+(s.b[1]-s.a[1])*t,yaw:Math.atan2(s.b[0]-s.a[0],s.b[1]-s.a[1])}}
-    build(i,type){const t=towers[type];if(this.ended||!t||!this.pads[i]||this.towers[i]||this.gold<t.cost)return false;this.gold-=t.cost;this.towers[i]={type,level:1,spent:t.cost,cd:0};this.onEvent("build");return true}
+    build(i,type){const t=towers[type];if(this.ended||!t||!this.pads[i]||this.supplyHealth[i-this.baseSites]>0||this.towers[i]||this.gold<t.cost)return false;this.gold-=t.cost;this.towers[i]={type,level:1,spent:t.cost,cd:0};this.onEvent("build");return true}
     upgrade(i){const t=this.towers[i];if(this.ended||!t||t.level>=3||this.gold<upgradeCost(t))return false;const cost=upgradeCost(t);this.gold-=cost;t.spent+=cost;t.level++;this.onEvent("upgrade");return true}
     sell(i){const t=this.towers[i];if(this.ended||!t)return false;this.gold+=Math.floor(t.spent*.65);this.towers[i]=null;this.onEvent("sell");return true}
     start(){
@@ -60,6 +66,19 @@
       if(type==="cannon"){for(const e of this.enemies){if(Math.hypot(e.x-target.x,e.y-target.y)<=22)e.hp-=stats.damage*(e.type==="runner"?.6:1)}this.burst(target.x,target.y-3,"#ffc272",9)}
       else{target.hp-=type==="arrow"?arrowDamage(target,stats.damage):stats.damage;if(type==="frost"){target.slow=2;this.burst(target.x,target.y-3,"#ade6f0",4)}}
       this.onEvent("shot",type);
+    }
+    clearSupply(i,t,stats){
+      const j=this.markedSupply,c=this.supplies[j],[x,y]=this.pads[i];
+      if(!c||Math.hypot(c.x-x,c.z-y)>stats.range)return false;
+      t.yaw=Math.atan2(c.x-x,c.z-y);
+      this.shots.push({x,y,tx:c.x,ty:c.z,type:t.type,ttl:.29,max:.29});
+      this.onEvent("shot",t.type);
+      this.supplyHealth[j]=Math.max(0,this.supplyHealth[j]-stats.damage);
+      if(!this.supplyHealth[j]){
+        this.gold+=c.gold;this.markedSupply=null;
+        this.burst(c.x,c.z,"#efc36c",10);this.onEvent("salvage",c);
+      }
+      return true;
     }
     aimRanger(dt){
       const r=this.ranger;if(!r)return;
@@ -94,6 +113,7 @@
       this.aimRanger(dt);
       for(let i=0;i<this.towers.length;i++){const t=this.towers[i];if(!t)continue;t.cd=Math.max(0,t.cd-dt);if(t.cd>0)continue;
         const stats=levelStats(t.type,t.level),[x,y]=this.pads[i];let target=null;
+        if(this.markedSupply!==null&&this.clearSupply(i,t,stats)){t.cd=stats.delay;continue}
         for(const e of this.enemies)if(e.hp>0&&e.d<this.length&&(!target||e.d>target.d)&&Math.hypot(e.x-x,e.y-y)<=stats.range)target=e;
         if(target){this.fire(i,t,target,stats);t.cd=stats.delay}
       }

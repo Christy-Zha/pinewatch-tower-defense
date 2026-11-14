@@ -31,8 +31,14 @@
     return chosen.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
   }
   const paletteKeys=["grass","grass2","soil","rock","tree","tree2","road","water","accent"];
+  // Each cache is within a starting tower site's reach and clear of the marching route.
+  const supplySites=[
+    [[155,54],[395,86]], [[163,90],[363,138]], [[147,90],[391,94]], [[155,42],[407,154]],
+    [[67,154],[339,106]], [[115,230],[403,134]], [[63,190],[403,202]], [[127,222],[407,202]]
+  ];
   chapters.forEach((s,i)=>{
     s.path=s.route;s.pads=pads(s.path);s.palette=Object.fromEntries(paletteKeys.map((k,j)=>[k,s.colors[j]]));
+    s.supplies=supplySites[i].map(([x,z],j)=>({x,z,name:j?"辎重箱":"前哨木箱",hp:(j?185:92)+i*(j?28:13),gold:j?30:18}));
     const [entry,next]=s.path,dx=next[0]-entry[0],dz=next[1]-entry[1],len=Math.hypot(dx,dz);
     const along=Math.min(40,len*.7),side=15;
     s.post=[entry[0]+(dx*along+dz*side)/len,entry[1]+(dz*along-dx*side)/len];

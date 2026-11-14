@@ -136,11 +136,23 @@
     }
     render(g,selected,choice,hover){
       this.begin();
+      const effect=new Mesh();
+      g.supplies.forEach((c,j)=>{
+        if(!g.supplyHealth[j])return;
+        this.drawData(this.model("supply/"+j,m=>{
+          const w=j?15:12,h=j?9:7;
+          m.box(0,h/2,0,w,h,10,"#985c36");
+          for(const z of [-3.4,0,3.4])m.box(0,h+.45,z,w+1,.9,3.1,"#cf9454");
+          for(const x of [-w*.32,w*.32])m.box(x,h/2+.4,0,1.3,h+1.2,10.6,"#715335");
+          m.box(0,h*.62,5.3,2.3,2.8,1,"#ffd379");
+        }),c.x,2.9,c.z,.15);
+        if(g.markedSupply===j)effect.ring(c.x,c.z,12,3,"#ffda75",2);
+      });
       g.towers.forEach((t,i)=>{if(!t)return;const [x,z]=g.pads[i],key=[t.type,t.level,this.skin].join("/");
         this.drawData(this.model(key,m=>PineFigures.tower(m,t.type,0,0,t.level,this.skin)),x,1.4,z,t.yaw||0)});
       const r=g.ranger,aiming=g.phase==="fight"&&(r.target!==null||r.released);
       this.drawData(this.character("ranger",aiming?"shoot":"idle",aiming?r.cycle:g.time*.33,this.skin,false,aiming),r.x,1,r.z,r.yaw);
-      const effect=new Mesh();for(const e of g.enemies){
+      for(const e of g.enemies){
         const frozen=e.frozen>0||e.slow>0,phase=e.frozen>0?0:e.d/(e.type==="runner"?16:12)+e.id*.13;
         this.drawData(this.character(e.type,"walk",phase,this.skin,frozen),e.x,1,e.y,e.yaw);
         if(e.hp<e.maxHp){const h=e.type==="boss"?30:e.type==="brute"?21:18,frac=Math.max(0,e.hp/e.maxHp),ang=-this.angle;

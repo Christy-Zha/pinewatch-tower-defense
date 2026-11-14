@@ -8,10 +8,28 @@
   }
   function restore(p,g){
     const r=p.run;if(!r||r.chapter!==p.chapter||!r.state)return false;const s=r.state;
-    if(!Number.isInteger(s.wave)||s.wave<0||s.wave>g.waves.length||!Array.isArray(s.towers)||s.towers.length!==g.pads.length||!["fight","ready","lost","won"].includes(s.phase))return false;
-    for(const f of fields)if(s[f]!==undefined)g[f]=s[f];g.paused=s.phase==="fight";return true;
+    if(!Number.isInteger(s.wave)||s.wave<0||s.wave>g.waves.length||!Array.isArray(s.towers)||![g.baseSites,g.pads.length].includes(s.towers.length)||!["fight","ready","lost","won"].includes(s.phase))return false;
+    for(const f of fields)if(s[f]!==undefined)g[f]=s[f];
+    g.towers=Array.from({length:g.pads.length},(_,i)=>s.towers[i]||null);
+    g.supplyHealth=g.supplies.map((c,i)=>Number.isFinite(s.supplyHealth?.[i])?Math.max(0,Math.min(c.hp,s.supplyHealth[i])):c.hp);
+    g.markedSupply=g.supplyHealth[s.markedSupply]>0?s.markedSupply:null;
+    g.paused=s.phase==="fight";return true;
   }
-  function save(p,g){const state={};for(const f of fields)state[f]=g[f];p.run={chapter:p.chapter,state,payout:p.run?.payout||null};try{localStorage.setItem(key,JSON.stringify(p));return true}catch{return false}}
+  function save(p,g){
+    const state={supplyHealth:g.supplyHealth,markedSupply:g.markedSupply};for(const f of fields)state[f]=g[f];
+    p.run={chapter:p.chapter,state,payout:p.run?.payout||null};
+    try{
+      const raw=localStorage.getItem(key);let stored;
+      try{stored=JSON.parse(raw)}catch{}
+      if(stored?.resetId&&stored.resetId!==p.resetId)return true;
+      localStorage.setItem(key,JSON.stringify(p));return true;
+    }catch{return false}
+  }
+  function resetCampaign(p){
+    const next={...fresh(),resetId:Date.now().toString(36)+Math.random().toString(36).slice(2)};
+    try{localStorage.setItem(key,JSON.stringify(next))}catch{return false}
+    Object.assign(p,next);return true;
+  }
   function purchase(p,id){
     const i=items[id];if(!i)return false;
     if(i.kind==="skin"&&p.skins.includes(id)){p.skin=id;return true}if(p.bank<i.price)return false;p.bank-=i.price;
@@ -27,8 +45,8 @@
   function settle(p,g){
     if(g.phase!=="won"||p.run?.payout)return null;
     const first=!p.records[p.chapter],bonus=first?45+p.chapter*10:0,earned=g.gold+bonus;
-    p.bank+=earned;const previous=p.records[p.chapter];p.records[p.chapter]={health:Math.max(previous?.health||0,g.health),wins:(previous?.wins||0)+1};
+    p.bank+=earned;const previous=p.records[p.chapter];p.records[p.chapter]={health:Math.max(previous?.health||0,g.health),wins:(previous?.wins||0)+1,salvaged:!!previous?.salvaged||(g.supplies.length>0&&g.clearedSupplies===g.supplies.length)};
     p.unlocked=Math.min(chapters.length-1,Math.max(p.unlocked,p.chapter+1));p.run=p.run||{};p.run.payout={earned,bonus};return p.run.payout;
   }
-  window.PineProgress={load,save,restore,purchase,allowed,use,settle};
+  window.PineProgress={key,load,save,restore,resetCampaign,purchase,allowed,use,settle};
 })();
