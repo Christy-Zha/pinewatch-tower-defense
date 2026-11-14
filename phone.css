@@ -1,0 +1,118 @@
+/* The handset uses the same map, tower buttons and dialogs as the desktop. */
+.phone-tools,.dock-tabs .phone-intel-tab { display:none }
+
+@media (max-width:600px) and (orientation:portrait), (max-width:960px) and (max-height:540px) and (orientation:landscape) {
+  :root {
+    --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+    --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px);
+    --nav-h:52px; --rim:8px;
+    -webkit-text-size-adjust:100%;
+  }
+  body { margin:0;min-height:0;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:#15251e }
+  button { -webkit-tap-highlight-color:transparent;touch-action:manipulation }
+  .topbar { height:auto;flex:none;border:0;background:#1a2b23 }
+  .navwrap { min-height:calc(44px + var(--safe-t));height:auto;padding:var(--safe-t) max(12px,var(--safe-r)) 0 max(12px,var(--safe-l));gap:6px }
+  .brand {gap:8px}.brand canvas {width:24px;height:28px}.brand strong {font-size:16px;letter-spacing:2px}.brand small {display:none}
+  .utilities {gap:4px}.utilities .sq,.board-actions #sound {width:44px;height:44px;border:0;background:transparent}.utilities .sq svg,.board-actions #sound svg {width:19px;height:19px}
+  .nav-actions {position:fixed;z-index:700;inset:auto 0 0;display:grid;grid-template-columns:repeat(4,1fr);height:calc(var(--nav-h) + var(--safe-b));padding:0 max(8px,var(--safe-r)) var(--safe-b) max(8px,var(--safe-l));gap:0;background:#182720;border-top:1px solid #425344}
+  .nav-actions .navbtn {display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:100%;min-height:44px;padding:0;border:0;color:#afc1b0;font:600 11px/1.2 system-ui,sans-serif}
+  .nav-actions .navbtn svg {width:19px;height:19px}
+  .nav-actions .navbtn.active {color:#f3ce83;background:radial-gradient(ellipse at center,#b8934b21,transparent 78%)}
+  main {flex:1;min-height:0;display:flex;max-width:none;margin:0;padding:0 max(var(--rim),var(--safe-r)) calc(var(--nav-h) + var(--safe-b)) max(var(--rim),var(--safe-l))}
+  main>.journal-strip,main>footer {display:none}
+  #battle-shell,.battle-expanded #battle-shell {width:100%;min-width:0;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:6px}
+  .battle-expanded #battle-shell {height:100vh;height:100dvh;padding:max(5px,var(--safe-t)) max(var(--rim),var(--safe-r)) max(5px,var(--safe-b)) max(var(--rim),var(--safe-l))}
+  #battle-shell .overview,.battle-expanded #battle-shell .overview {display:grid;grid-template-columns:1fr;align-items:center;gap:5px;margin:0;padding:4px 2px 0}
+  #battle-shell .heading {display:flex;align-items:center;gap:8px;min-width:0}
+  #battle-shell .heading h1 {order:-1;font-size:23px;letter-spacing:1px;line-height:1.15;margin:0}
+  #battle-shell .heading .eyebrow {display:block;font-size:0;letter-spacing:0}
+  #battle-shell .heading .eyebrow b,#battle-shell .heading .eyebrow .diamond,#battle-shell .heading p {display:none}
+  #chapter-count {font:600 10px/1.3 system-ui,sans-serif;letter-spacing:.5px;color:#d6ba7e}
+  #battle-shell .hud {width:100%;display:grid;grid-template-columns:repeat(3,1fr);border:0;border-radius:0;border-block:1px solid #3a4d3d;background:transparent;padding:6px 0;margin:0}
+  #battle-shell .metric {padding:0 3px;min-height:22px;gap:4px;justify-content:center}
+  #battle-shell .metric>div {display:flex;gap:4px;align-items:baseline}
+  #battle-shell .metric small {font-size:10px;line-height:1;margin:0;letter-spacing:0}
+  #battle-shell .metric strong {font-size:16px}
+  #battle-shell .metric em {font-size:10px;white-space:nowrap}
+  #battle-shell .metric i svg {width:14px;height:14px}
+  #battle-shell .layout {min-width:0;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;align-items:stretch;gap:6px}
+  #battle-shell .board {position:relative;display:grid;grid-template-rows:minmax(0,1fr) auto;min-height:0;height:100%;border-radius:9px;border-color:#405947}
+  #battle-shell .board>.panel-head {position:absolute;z-index:601;top:0;inset-inline:0;padding:3px 5px;justify-content:flex-end;background:transparent;pointer-events:none}
+  #battle-shell .board>.panel-head>.section-title {display:none}
+  .board-actions {gap:4px;pointer-events:auto}
+  #battle-shell #battle-expand {width:44px;height:44px;min-height:44px;background:transparent;border:0;padding:0}
+  #battle-expand svg {width:20px;height:20px}
+  #battle-expand span {display:none}
+  #battle-shell .board-actions .phase {background:#1b3026ed;color:#d4e5c8;border-color:#69795a}
+  #battle-shell .map-frame {margin:0;border:0;border-radius:0;height:100%;min-height:0}
+  #battle-shell .map-area {height:100%;min-height:0;aspect-ratio:auto}
+  .scene-meta {top:9px;left:9px}.scene-meta .location {background:#1b3026d9;border-color:#536a53}
+  .map-area #map-msg {max-width:95%;bottom:54px;font-size:12px;white-space:normal;text-align:center}
+  .map-area .pad {width:44px;height:44px!important;min-width:0;min-height:0}
+  .phone-tools {display:inline-flex;align-items:center;justify-content:center;gap:5px;position:absolute;z-index:601;right:6px;bottom:6px;height:44px;min-width:56px;padding:0 9px;color:#efdfba;background:#1a2b24ee;border:1px solid #66785f;border-radius:7px;font:600 12px system-ui,sans-serif}
+  .phone-tools i svg {width:16px;height:16px}
+  .camera-bar {display:none;max-width:calc(100% - 12px);right:6px;bottom:54px;border-radius:7px}
+  .map-area.show-tools .camera-bar {display:flex}
+  .map-area .camera-bar button,.map-area .camera-bar .frontline {min-width:44px;width:auto;height:44px;padding:0 8px}
+  #battle-shell .controls {min-height:0;display:grid;grid-template-columns:minmax(0,1.43fr) minmax(0,2.18fr);gap:6px;padding:5px;background:#1b2b22}
+  .controls .combat-progress {display:none}
+  .controls .play-controls {display:grid;grid-template-columns:.72fr .94fr 1.23fr;gap:4px;margin:0}
+  #battle-shell .controls button {min-height:44px;min-width:0;margin:0;padding:0 3px;gap:3px;border-radius:6px;font-size:12px;white-space:nowrap}
+  #battle-shell .controls .primary {font-size:14px}
+  #battle-shell .controls .secondary i svg {width:13px;height:13px}
+  #battle-shell .layout aside {display:flex;flex-direction:column;gap:0;min-height:0;min-width:0;max-height:32dvh;overflow:auto;overscroll-behavior:contain;border:1px solid #405343;border-radius:8px;background:#1a2a21}
+  #battle-shell aside>.dock-tabs {position:sticky;top:0;z-index:1;order:-2;width:100%;flex:none;align-self:stretch;display:flex;align-items:center;justify-content:space-evenly;gap:0;background:#1a2a21;border-bottom:1px solid #3a4a3c}
+  #battle-shell .dock-tabs button {display:inline-flex;flex:1;gap:5px;align-items:center;justify-content:center;min-height:44px;padding:0 4px;color:#b6c5b6;border:0;border-radius:0;background:transparent;font:600 13px system-ui,sans-serif}
+  #battle-shell .dock-tabs button[aria-pressed=true] {color:#f1cd83;box-shadow:inset 0 -2px #d0a963}
+  #battle-shell .dock-tabs svg {height:16px;width:16px}
+  #battle-shell aside>.panel {width:100%;flex:none;align-self:stretch;border:0;border-radius:0;box-shadow:none;background:transparent}
+  #battle-shell .ranger-card,#battle-shell .armory>.panel-head,.armory .build-hint,#battle-shell .cards-panel .section-title {display:none}
+  #battle-shell:not([data-dock=armory]) .armory,#battle-shell:not([data-dock=cards]) .cards-panel,#battle-shell:not([data-dock=intel]) .intel {display:none}
+  #battle-shell[data-dock=intel] .intel {display:block}
+  #battle-shell .armory-content,#battle-shell .cards-panel,#battle-shell .intel,#battle-shell .manage {padding:6px}
+  #battle-shell .tower-list {grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+  #battle-shell .tower-card {min-height:54px;grid-template-columns:31px 1fr;grid-template-rows:auto auto;column-gap:5px;row-gap:1px;padding:5px 3px;letter-spacing:0}
+  #battle-shell .tower-image {grid-row:1/3}.tower-image,.tower-image canvas {width:30px;height:34px}
+  #battle-shell .tower-name {font-size:13px;white-space:nowrap;letter-spacing:0}
+  #battle-shell .tower-desc {display:none}.tower-cost {font-size:12px}
+  #battle-shell .cards-panel {display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:center;gap:3px}
+  #battle-shell .cards-panel .intel-head {grid-column:2;grid-row:1;display:flex;align-items:center;justify-content:center;margin:0}
+  #battle-shell .cards-panel .hand {grid-column:1;grid-row:1}
+  #battle-shell .cards-panel #cards-store {min-height:44px;min-width:44px;font-size:12px}
+  #battle-shell .hand-card {min-height:54px;flex-direction:column;gap:2px;font-size:11px}
+  #battle-shell .manage:not([hidden]) {display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:3px 6px}
+  #battle-shell .manage .back-button {grid-column:1;grid-row:1;min-height:44px;text-align:left;margin:0}
+  #battle-shell .manage .manage-heading {grid-column:2;grid-row:1}.manage .manage-heading canvas,.manage .manage-heading p,#battle-shell .manage>p,#battle-shell .manage .stats-line {display:none}
+  #battle-shell .manage .primary,#battle-shell .manage .secondary {min-height:44px;margin:0;font-size:12px}
+  #battle-shell .intel-head {margin-bottom:2px}.intel-row button {min-height:44px}
+  dialog,dialog[data-kind=models] {width:min(510px,calc(100% - var(--safe-l) - var(--safe-r) - 18px));max-height:calc(100dvh - var(--safe-t) - var(--safe-b) - 14px);inset:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);margin:auto;padding:13px;overscroll-behavior:contain;scroll-padding:8px}
+  dialog .close,.shop-tabs button,dialog .primary,dialog .secondary,dialog .model-roster button,dialog .studio-tools button {min-height:44px}
+  dialog .close {min-width:44px}#dialog-actions {flex-wrap:wrap}
+}
+@media (max-width:360px) and (orientation:portrait) {
+  :root {--rim:4px}.metric small {display:none}
+  #battle-shell .tower-card {grid-template-columns:23px 1fr;gap:3px}.tower-image,.tower-image canvas {width:23px;height:28px}
+  #battle-shell .controls .secondary i {display:none}
+}
+@media (max-width:960px) and (max-height:540px) and (orientation:landscape) {
+  :root {--nav-h:0px;--rim:5px}
+  .navwrap {min-height:calc(44px + var(--safe-t));padding-inline:max(8px,var(--safe-l)) max(8px,var(--safe-r))}
+  .nav-actions {position:static;display:flex;gap:4px;inset:auto;height:44px;padding:0;background:none;border:0}
+  .nav-actions .navbtn {height:44px;flex-direction:row;gap:5px;padding-inline:8px;font-size:12px}
+  .nav-actions .navbtn svg {width:16px;height:16px}
+  #battle-shell .overview {display:flex;justify-content:space-between;gap:6px;padding:0}
+  #battle-shell .heading h1 {font-size:17px}
+  #battle-shell .hud {width:auto;min-width:46%;padding:2px 4px}
+  #battle-shell,#battle-shell .layout {gap:3px}
+  #battle-shell .layout {grid-template-columns:minmax(0,1fr) clamp(145px,24vw,228px);grid-template-rows:minmax(0,1fr)}
+  #battle-shell .layout aside {max-height:none}
+  #battle-shell .dock-tabs button {font-size:11px}#battle-shell .dock-tabs button i {display:none}
+  #battle-shell .tower-list {grid-template-columns:1fr}
+  #battle-shell .tower-card {min-height:44px;grid-template-columns:30px 1fr auto;grid-template-rows:auto}.tower-card .tower-image {grid-row:1}
+  #battle-shell .cards-panel {display:flex;flex-direction:column-reverse;align-items:stretch}
+  #battle-shell .hand {grid-template-columns:1fr}
+  #battle-shell .controls {grid-template-columns:minmax(100px,1fr) minmax(200px,1.28fr)}
+  #battle-shell .manage:not([hidden]) {grid-template-columns:1fr}
+  #battle-shell .manage .manage-heading {grid-column:1;grid-row:auto}
+  dialog .studio-stage {height:min(65dvh,300px);min-height:140px}
+}

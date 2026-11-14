@@ -110,21 +110,39 @@
     if(modal==="models")studio?.tick(now,dt);
     else if(!modal&&portraitVisible&&!document.hidden){const frame=Math.floor(now/380)%8;if(frame!==portraitFrame||portraitSkin!==profile.skin){rangerView.specimen("ranger",profile.skin,"idle",frame/8,0,true);portraitFrame=frame;portraitSkin=profile.skin}}
     requestAnimationFrame(animate)}
-  let drag=null,blockClick=0;
-  const area=$("map-area");area.addEventListener("pointerdown",e=>{if(e.button!==0||e.target.closest(".camera-bar"))return;drag={id:e.pointerId,x:e.clientX,y:e.clientY,a:renderer.angle,p:renderer.pitch,moved:false}});
-  area.addEventListener("pointermove",e=>{if(!drag||drag.id!==e.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(!drag.moved&&Math.hypot(dx,dy)<6)return;
+  let drag=null,blockClick=0,pinchDistance=0;
+  const touches=new Map(),area=$("map-area");
+  function fingerDistance(){const [a,b]=touches.values();return Math.hypot(a.x-b.x,a.y-b.y)}
+  area.addEventListener("pointerdown",e=>{
+    if(e.button!==0||e.target.closest(".camera-bar,.phone-tools"))return;
+    if(e.pointerType==="touch"){
+      touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if(touches.size>=2){drag=null;pinchDistance=fingerDistance();for(const id of touches.keys())area.setPointerCapture(id);return}
+    }
+    blockClick=0;
+    drag={id:e.pointerId,x:e.clientX,y:e.clientY,a:renderer.angle,p:renderer.pitch,moved:false}
+  });
+  area.addEventListener("pointermove",e=>{
+    if(touches.has(e.pointerId))touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pinchDistance&&touches.size<2)return;
+    if(touches.size>=2){const distance=fingerDistance();if(pinchDistance>2&&distance>2)zoomMap(distance/pinchDistance);pinchDistance=distance;return}
+    if(!drag||drag.id!==e.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(!drag.moved&&Math.hypot(dx,dy)<6)return;
     if(!drag.moved){area.setPointerCapture(e.pointerId);drag.moved=true}hover=null;renderer.angle=drag.a-dx*.009;renderer.pitch=Math.max(.43,Math.min(1.14,drag.p+dy*.006));dirty=true});
-  function release(e){if(!drag||e.pointerId!==drag.id)return;if(drag.moved){blockClick=performance.now()+220;if(area.hasPointerCapture(e.pointerId))area.releasePointerCapture(e.pointerId)}drag=null}
+  function release(e){
+    if(touches.delete(e.pointerId)&&pinchDistance){blockClick=performance.now()+220;if(!touches.size)pinchDistance=0;else if(touches.size>=2)pinchDistance=fingerDistance()}
+    if(!drag||e.pointerId!==drag.id)return;if(drag.moved){blockClick=performance.now()+220;if(area.hasPointerCapture(e.pointerId))area.releasePointerCapture(e.pointerId)}drag=null
+  }
   window.addEventListener("pointerup",release);window.addEventListener("pointercancel",release);
   const frontline=btn("前线近景","frontline",()=>{if(renderer.frontline)renderer.resetCamera();else renderer.follow(g.ranger);hover=null;frontline.setAttribute("aria-pressed",String(renderer.frontline));dirty=true});
   frontline.id="frontline";frontline.title="切换到阿遥身边，观察实际交战";document.querySelector(".camera-bar").prepend(frontline);
   $("cam-left").onclick=()=>{renderer.angle-=Math.PI/6;dirty=true};$("cam-right").onclick=()=>{renderer.angle+=Math.PI/6;dirty=true};$("cam-home").onclick=()=>{renderer.resetCamera();frontline.setAttribute("aria-pressed","false");dirty=true};
-  window.addEventListener("pine-camera-zoom",event=>{
-    const factor=Number(event.detail);if(!(factor>0&&Number.isFinite(factor)))return;
+  function zoomMap(factor){
+    if(!(factor>0&&Number.isFinite(factor)))return;
     if(renderer.frontline)renderer.viewHeight=Math.max(36,Math.min(110,renderer.viewHeight/factor));
     else renderer.zoom=Math.max(.8,Math.min(2.4,renderer.zoom*factor));
     hover=null;lastProjection="";dirty=true;
-  });
+  }
+  window.addEventListener("pine-camera-zoom",event=>zoomMap(Number(event.detail)));
   function closeDialog(){if($("dialog").open)$("dialog").close();modal="";stamp=0;dirty=true;update()}
   function dialog(kind,label,title,html="",actions=[]){
     modal=kind;const d=$("dialog");d.dataset.kind=kind;$("dialog-label").textContent=label;$("dialog-title").textContent=title;$("dialog-body").innerHTML=html;$("dialog-actions").replaceChildren();

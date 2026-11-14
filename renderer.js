@@ -70,7 +70,10 @@
     set(stage,index,skin){
       if(this.stage===stage&&this.skin===skin)return;const m=new Mesh();PineScenery.build(m,stage,index,skin);this.release(this.staticData);this.staticData=this.data(m);this.stage=stage;this.skin=skin;this.softwareCache=null;this.dirty=true;
     }
-    resetCamera(){this.angle=-.34;this.pitch=.69;this.zoom=1;this.center=[240,5,142];this.viewHeight=0;this.frontline=false;this.dirty=true}
+    resetCamera(){
+      const portrait=this.canvas.id==="field"&&window.matchMedia("(max-width:600px) and (orientation:portrait)").matches;
+      this.angle=portrait ? -1.43 : -.34;this.pitch=portrait ? .92 : .69;this.zoom=1;this.center=[240,5,142];this.viewHeight=0;this.frontline=false;this.dirty=true;
+    }
     follow(ranger){this.frontline=true;this.center=[ranger.x,13,ranger.z];this.viewHeight=66;this.pitch=.37;this.angle=-.65;this.dirty=true}
     camera(){
       const cssW=Math.max(1,this.canvas.clientWidth),cssH=Math.max(1,this.canvas.clientHeight),dpr=Math.min(1.65,window.devicePixelRatio||1);

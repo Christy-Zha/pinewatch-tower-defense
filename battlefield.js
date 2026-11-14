@@ -8,6 +8,19 @@
   const sound=document.getElementById('sound'),utilities=sound.parentElement;
   const dockButtons=[...shell.querySelectorAll('[data-dock-tab]')];
   const compact=window.matchMedia('(max-width:820px) and (orientation:portrait), (max-width:580px)');
+  const phone=window.matchMedia('(max-width:600px) and (orientation:portrait), (max-width:960px) and (max-height:540px) and (orientation:landscape)');
+  const portrait=window.matchMedia('(max-width:600px) and (orientation:portrait)');
+  const camera=map.querySelector('.camera-bar'), tools=document.createElement('button');
+  camera.id='camera-tools';tools.type='button';tools.className='phone-tools';
+  tools.setAttribute('aria-controls',camera.id);tools.setAttribute('aria-expanded','false');
+  tools.textContent='视角';tools.title='战场视角与缩放';map.append(tools);
+  function setTools(open){
+    map.classList.toggle('show-tools',open);tools.setAttribute('aria-expanded',String(open));tools.textContent=open?'收起':'视角';
+  }
+  tools.addEventListener('click',()=>setTools(!map.classList.contains('show-tools')));
+  camera.addEventListener('click',e=>{if(e.target.closest('#frontline,#cam-home'))setTools(false)});
+  phone.addEventListener('change',()=>{setTools(false);if(!phone.matches&&shell.dataset.dock==='intel')setDock('armory')});
+  portrait.addEventListener('change',()=>document.getElementById('cam-home').click());
   const outside=[document.querySelector('.topbar'),document.querySelector('.journal-strip'),document.querySelector('footer')];
   const enterIcon='M3 7V3h4m6 0h4v4m0 6v4h-4m-6 0H3v-4';
   const exitIcon='M3 7h4V3m6 0v4h4m0 6h-4v4m-6 0v-4H3';
@@ -28,6 +41,7 @@
   function setDock(name){
     shell.dataset.dock=name;
     for(const tab of dockButtons)tab.setAttribute('aria-pressed',String(tab.dataset.dockTab===name));
+    shell.querySelector('aside').scrollTop=0;
   }
   function zoom(value){window.dispatchEvent(new CustomEvent('pine-camera-zoom',{detail:value}));}
 
@@ -42,7 +56,7 @@
     }
   },true);
   document.getElementById('pad-controls').addEventListener('click',event=>{
-    if(inBattleView()&&compact.matches&&event.target.closest('.pad')&&!document.getElementById('manage').hidden)setDock('armory');
+    if((phone.matches||inBattleView()&&compact.matches)&&event.target.closest('.pad')&&!document.getElementById('manage').hidden)setDock('armory');
   });
   map.addEventListener('wheel',event=>{
     if(!inBattleView()||event.ctrlKey||event.metaKey||event.deltaY===0)return;
