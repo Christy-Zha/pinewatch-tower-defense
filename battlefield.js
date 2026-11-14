@@ -25,6 +25,13 @@
   const enterIcon='M3 7V3h4m6 0h4v4m0 6v4h-4m-6 0H3v-4';
   const exitIcon='M3 7h4V3m6 0v4h4m0 6h-4v4m-6 0v-4H3';
   const factor=1.24;
+  const landscapePhone=matchMedia('(orientation:landscape) and (max-height:580px) and (pointer:coarse)');
+  async function nativeScreen(){
+    try{
+      if(!document.fullscreenElement)await document.documentElement.requestFullscreen();
+      await screen.orientation?.lock?.('landscape');
+    }catch{/* The viewport layout also works when the browser owns its chrome. */}
+  }
 
   function setExpanded(on){
     if(on)expand.before(sound);else utilities.prepend(sound);
@@ -35,7 +42,9 @@
     expand.querySelector('path').setAttribute('d',on?exitIcon:enterIcon);
     expand.title=on?'退出全屏战场（Esc）':'进入全屏战场';
     expand.setAttribute('aria-label',expand.title);
-    expand.focus({preventScroll:true});
+    if(!on&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+    if(on&&!dialog.open)document.getElementById('battle-menu').focus({preventScroll:true});
+    else if(!dialog.open)expand.focus({preventScroll:true});
   }
   function inBattleView(){return document.documentElement.classList.contains('battle-expanded');}
   function setDock(name){
@@ -45,7 +54,14 @@
   }
   function zoom(value){window.dispatchEvent(new CustomEvent('pine-camera-zoom',{detail:value}));}
 
-  expand.addEventListener('click',()=>setExpanded(!inBattleView()));
+  expand.addEventListener('click',()=>{
+    const on=!inBattleView();setExpanded(on);
+    if(on){if(portrait.matches)window.dispatchEvent(new Event('pine-rotate-hint'));nativeScreen()}
+  });
+  window.addEventListener('pine-native-screen',nativeScreen);
+  document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&inBattleView())setExpanded(false)});
+  landscapePhone.addEventListener('change',e=>{if(e.matches)setExpanded(true)});
+  if(landscapePhone.matches)setExpanded(true);
   document.getElementById('cam-zoom-in').addEventListener('click',()=>zoom(factor));
   document.getElementById('cam-zoom-out').addEventListener('click',()=>zoom(1/factor));
   for(const tab of dockButtons)tab.addEventListener('click',()=>setDock(tab.dataset.dockTab));

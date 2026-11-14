@@ -14,6 +14,7 @@
   }
   function build(m,stage,index=0,skin='pine') {
     let seed=(4723921+index*84387)>>>0;
+    index=stage.province?.scenery??index;
     const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
     const between=(a,b)=>a+(b-a)*rnd(),choose=arr=>arr[Math.floor(rnd()*arr.length)];
     const P={grass:'#8eae64',grass2:'#b8c97a',soil:'#a37b54',rock:'#89968c',

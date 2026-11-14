@@ -116,3 +116,68 @@
   #battle-shell .manage .manage-heading {grid-column:1;grid-row:auto}
   dialog .studio-stage {height:min(65dvh,300px);min-height:140px}
 }
+
+#battle-menu {display:none}
+html.battle-expanded #battle-shell {display:block;padding:0;width:100%;height:100dvh;background:#20332a}
+html.battle-expanded #battle-shell .layout,
+html.battle-expanded #battle-shell .board,
+html.battle-expanded #battle-shell .map-frame,
+html.battle-expanded #battle-shell .map-area {display:block;position:relative;width:100%;height:100%;margin:0;border:0;border-radius:0}
+html.battle-expanded #battle-shell .layout aside,
+html.battle-expanded #battle-shell .board>.panel-head>.section-title,
+html.battle-expanded #battle-shell .board-actions>:not(#battle-menu),
+html.battle-expanded #battle-shell .controls #restart,
+html.battle-expanded #battle-shell .controls #pause,
+html.battle-expanded #battle-shell .combat-progress {display:none}
+html.battle-expanded #battle-shell .overview {
+  position:absolute;z-index:605;top:max(7px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));
+  width:auto;max-width:calc(100% - 103px - env(safe-area-inset-left) - env(safe-area-inset-right));min-height:35px;margin:0;
+  display:flex;align-items:center;gap:10px;padding:4px 10px;border:1px solid #87936c77;border-radius:8px;background:#182a22ed;pointer-events:none
+}
+html.battle-expanded #battle-shell .heading .eyebrow {display:none}
+html.battle-expanded #battle-shell .heading h1 {font-size:16px;letter-spacing:.04em;white-space:nowrap}
+html.battle-expanded #battle-shell .hud {display:flex;gap:8px;width:auto;min-width:0;padding:0;margin:0;border:0;background:none}
+html.battle-expanded #battle-shell .metric {padding:0;min-height:0;border:0}
+html.battle-expanded #battle-shell .metric small {display:none}
+html.battle-expanded #battle-shell .board>.panel-head {position:absolute;z-index:605;top:max(6px,env(safe-area-inset-top));right:max(9px,env(safe-area-inset-right));left:auto;padding:0;border:0;background:none}
+html.battle-expanded #battle-menu {display:inline-flex;align-items:center;gap:7px;height:44px;padding:0 13px;color:#f1d8a2;border:1px solid #91a08088;border-radius:8px;background:#1a2d24f2;font:600 14px system-ui;cursor:pointer}
+html.battle-expanded #battle-shell .controls {
+  position:absolute;bottom:max(7px,env(safe-area-inset-bottom));left:max(10px,env(safe-area-inset-left));z-index:601;
+  display:flex;gap:5px;min-height:0;padding:0;border:0;background:none;width:auto
+}
+html.battle-expanded #battle-shell .controls .play-controls {display:flex}
+html.battle-expanded #battle-shell .controls button {min-height:44px;padding:0 12px}
+html.battle-expanded .scene-meta {top:auto;left:auto;right:max(10px,env(safe-area-inset-right));bottom:max(7px,env(safe-area-inset-bottom))}
+html.battle-expanded .scene-meta .location,html.battle-expanded .phone-tools {display:none}
+html.battle-expanded #supply-orders {height:44px;border-radius:6px}
+html.battle-expanded .camera-bar {bottom:max(7px,env(safe-area-inset-bottom));right:calc(102px + env(safe-area-inset-right))}
+html.battle-expanded .map-area #map-msg {bottom:58px}
+.site-choices,.field-menu {display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px}
+.site-choice {display:grid;place-items:center;gap:4px;padding:8px 4px;border:1px solid #667452;border-radius:7px;background:#2a392c;color:#f0e5cb;cursor:pointer}
+.site-choice canvas {width:54px;height:54px}
+.site-choice span {color:#e6c77e;font-size:12px}
+.site-choice:disabled {opacity:.45;cursor:default}
+.site-choice:hover:enabled,.site-choice:focus-visible {border-color:#e3c176;background:#3c4530}
+#dialog[data-kind=site] {width:min(440px,94vw)}
+#dialog[data-kind=site]::backdrop {background:#0d1b174a}
+.field-menu button,.site-choices button {min-height:44px}
+.province-name {margin:18px 0 5px;color:#e7cc91;font-size:15px}
+@media(max-width:550px) {
+  html.battle-expanded #battle-shell .overview {gap:5px;padding-inline:6px}
+  html.battle-expanded #battle-shell .hud {gap:4px}
+  html.battle-expanded #battle-shell .metric em {display:none}
+  html.battle-expanded #battle-shell .heading h1 {font-size:13px}
+}
+
+#dialog[data-kind=site] {
+  position:fixed;inset:var(--site-y,10px) auto auto var(--site-x,10px);margin:0;
+  width:min(385px,calc(100vw - 18px));max-height:calc(100dvh - 18px);padding:14px;
+}
+#dialog[data-kind=site] #dialog-actions:empty {display:none}
+@media (orientation:landscape) and (max-height:580px) {
+  #dialog[data-kind=site] .site-choice {padding:3px;gap:1px}
+  #dialog[data-kind=site] .site-choice canvas {height:34px;width:34px}
+  #dialog[data-kind=site] #dialog-title {font-size:20px}
+  html.battle-expanded .phone-tools {display:inline-flex;bottom:max(7px,env(safe-area-inset-bottom));right:calc(94px + env(safe-area-inset-right))}
+  html.battle-expanded .map-area.show-tools .camera-bar {bottom:55px;right:max(8px,env(safe-area-inset-right))}
+}

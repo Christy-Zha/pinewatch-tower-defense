@@ -4,7 +4,7 @@
   const key="pinewatch.chronicle.v1",fields=["gold","health","wave","kills","phase","towers","enemies","queue","time","spawnIn","defeated","serial","waveSize","speed","ranger"];
   const fresh=()=>({version:1,chapter:0,unlocked:0,bank:80,cards:{hail:1,blaze:0,mend:0},skins:["pine"],skin:"pine",records:{},run:null});
   function load(){
-    try{const p=JSON.parse(localStorage.getItem(key));if(p?.version===1&&Number.isInteger(p.chapter)&&chapters[p.chapter]&&Number.isInteger(p.unlocked)&&p.unlocked>=p.chapter&&p.unlocked<chapters.length&&p.cards&&Array.isArray(p.skins)&&p.skins.includes(p.skin)&&Number.isSafeInteger(p.bank)&&p.bank>=0&&p.records)return p}catch{}return fresh()
+    try{const p=JSON.parse(localStorage.getItem(key));if(p?.version===1&&Number.isInteger(p.chapter)&&chapters[p.chapter]&&Number.isInteger(p.unlocked)&&p.unlocked>=p.chapter&&p.unlocked<chapters.length&&p.cards&&Array.isArray(p.skins)&&p.skins.includes(p.skin)&&Number.isSafeInteger(p.bank)&&p.bank>=0&&p.records){if(p.records[7]&&p.unlocked===7)p.unlocked=8;return p}}catch{}return fresh()
   }
   function restore(p,g){
     const r=p.run;if(!r||r.chapter!==p.chapter||!r.state)return false;const s=r.state;

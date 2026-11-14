@@ -62,9 +62,50 @@
       b.onpointerenter=ev=>{if(ev.pointerType==="mouse"&&!drag&&!g.supplyHealth[j]){hover=i;dirty=true}};b.onpointerleave=b.onblur=()=>{hover=null;dirty=true};b.onfocus=()=>{if(!g.supplyHealth[j])hover=i;dirty=true};
       b.onclick=()=>{if(g.ended||performance.now()<blockClick)return;
         if(g.supplyHealth[j]){orderSupply(j);return}
+        if(document.documentElement.classList.contains("battle-expanded")){siteOrders(i);return}
         if(g.towers[i]){selected=i;manageKey="";update();dirty=true;return}
         if(!g.build(i,choice)){msg("军费不足，还需 "+(towers[choice].cost-g.gold)+" 金币");return}
         selected=null;update();dirty=true;msg(towers[choice].name+" 已部署")};$("pad-controls").append(b);return b});
+  }
+  function siteOrders(i){
+    const tower=g.towers[i];
+    dialog("site","第 "+(i+1)+" 号塔位",tower?towers[tower.type].name+" · "+tower.level+" 级":"选择防御塔",'<div class="site-choices"></div>');
+    const list=$("dialog-body").firstElementChild;
+    if(tower){
+      const cost=upgradeCost(tower);
+      const improve=btn(tower.level===3?"已达最高等级":"升级 · "+cost+" 军费","primary",()=>{if(g.upgrade(i))closeDialog()});
+      improve.disabled=tower.level>=3||g.gold<cost;
+      list.append(improve,btn("拆除 · 回收 "+Math.floor(tower.spent*.65)+" 军费","secondary",()=>{if(g.sell(i))closeDialog()}));
+    }else for(const [type,t] of Object.entries(towers)){
+      const b=btn("","site-choice",()=>{if(g.build(i,type)){closeDialog();msg(t.name+" 已部署")}});
+      b.disabled=g.gold<t.cost;b.dataset.build=type;b.title=t.brief;
+      art(type,b);const label=make("strong"),price=make("span");label.textContent=t.name;price.textContent=t.cost+" 军费";b.append(label,price);list.append(b);
+    }
+    positionSiteMenu(i);
+  }
+  function positionSiteMenu(i){
+    const d=$("dialog"),p=pads[i].getBoundingClientRect(),gap=9;
+    const w=d.offsetWidth,h=d.offsetHeight;
+    const left=Math.min(Math.max(gap,p.left+p.width/2-w/2),innerWidth-w-gap);
+    const top=p.top-h-gap>=gap?p.top-h-gap:Math.min(p.bottom+gap,innerHeight-h-gap);
+    d.style.setProperty("--site-x",Math.max(gap,left)+"px");d.style.setProperty("--site-y",Math.max(gap,top)+"px");
+  }
+  function battleMenu(){
+    dialog("battle-menu","第 "+chapterNo()+" 关 · "+stage.region,stage.name,'<div class="field-menu"></div>');
+    const menu=$("dialog-body").firstElementChild;
+    const entry=(name,fn)=>menu.append(btn(name,"secondary",fn));
+    if(!g.ended)entry(g.paused?"继续战斗":"暂停战斗",()=>{closeDialog();pause()});
+    entry("战术手牌",()=>{
+      dialog("cards","战场指令","战术手牌",'<div class="field-menu"></div>');
+      const list=$("dialog-body").firstElementChild;
+      handButtons.forEach((source,i)=>{const b=btn(items[cardIds[i]].name+" ×"+profile.cards[cardIds[i]],"secondary",()=>{source.click();closeDialog()});b.disabled=source.disabled;list.append(b)});
+    });
+    entry("敌情预报",()=>dialog("forecast","战场指令",$("intel-wave").textContent,[...$("intel-body").querySelectorAll("strong,p")].map(el=>"<p>"+el.textContent+"</p>").join("")));
+    entry("战役纪事",journal);entry("渡鸦商店",shop);entry("角色图鉴",()=>inspect());
+    entry($("sound").title,()=>{$("sound").click();battleMenu()});
+    entry("本局重来",()=>$("restart").click());entry("全部重来",confirmReset);
+    if(!document.fullscreenElement&&document.documentElement.requestFullscreen)entry("启用系统全屏",()=>{closeDialog();window.dispatchEvent(new Event("pine-native-screen"))});
+    entry("退出全屏",()=>{closeDialog();$("battle-expand").click()});
   }
   function orderSupply(j){
     if(!g.markSupply(j))return;
@@ -80,7 +121,7 @@
     stage=chapters[profile.chapter];g=new Battle(stage.path,stage.pads,onEvent,stage);
     if(!restore||!P.restore(profile,g)){g.towers[1]={type:"arrow",level:1,spent:0,cd:0};profile.run=null}
     choice="arrow";selected=hover=null;clock=0;stamp=0;intelKey=manageKey="";renderer.resetCamera();$("frontline").setAttribute("aria-pressed","false");renderer.set(stage,profile.chapter,profile.skin);installPads();
-    $("chapter-title").textContent=stage.name;$("chapter-count").textContent="第 "+chapterNo()+" 章 / 共 08 章";$("mission").textContent=stage.mission;$("region").textContent=stage.region;
+    $("chapter-title").textContent=stage.name;$("chapter-count").textContent="第 "+chapterNo()+" 章 / 共 "+chapters.length+" 章";$("mission").textContent=stage.mission;$("region").textContent=stage.region;
     $("story-label").textContent="第 "+chapterNo()+" 章 · 战地手记";$("story-title").textContent=stage.subtitle;$("story").textContent=stage.brief;$("wave-max").textContent=" / "+stage.waves;
     update();draw();save();if(restore&&g.ended)outcome();
   }
@@ -189,16 +230,17 @@
   function outcome(){
     const won=g.phase==="won",final=won&&profile.chapter===chapters.length-1,reward=profile.run?.payout;
     const html=won?'<div class="chapter-prose">'+para(stage.after)+'</div><div class="settlement"><span>结余军费 <b>'+g.gold+'</b></span><span>首通奖励 <b>'+(reward?.bonus||0)+'</b></span><span>存入钱包 <b>+'+(reward?.earned||0)+'</b></span></div>':'<p>防线守到了第 '+g.wave+' 波。先在连续弯道布置箭塔，把炮塔留给成群的敌军。已购装扮与剩余手牌可带入重试。</p>';
-    const actions=won?(final?[["回顾八章纪事",journal],["返回沙盘",closeDialog,"secondary"]]:[["前往"+chapters[profile.chapter+1].name,()=>enter(profile.chapter+1)],["逛逛商店",shop,"secondary"]]):[["本局重来",restartChapter],["补给道具",shop,"secondary"]];
+    const actions=won?(final?[["回顾战役纪事",journal],["返回沙盘",closeDialog,"secondary"]]:[["前往"+chapters[profile.chapter+1].name,()=>enter(profile.chapter+1)],["逛逛商店",shop,"secondary"]]):[["本局重来",restartChapter],["补给道具",shop,"secondary"]];
     if(won)actions.push(["本局重来",restartChapter,"secondary"]);
-    dialog("result",final?"EPILOGUE · 终章":won?"CHAPTER CLEAR · 第 "+chapterNo()+" 章":"BATTLE REPORT",final?"大结局 · 山谷回响":won?stage.name+"守住了":"城门失守",html+(won?"<p>"+(g.clearedSupplies===g.supplies.length?"✦ 获得本章全清勋章":"物资清理 "+g.clearedSupplies+" / "+g.supplies.length)+"</p>":""),actions);
+    dialog("result",final?"EPILOGUE · 终章":won?"CHAPTER CLEAR · 第 "+chapterNo()+" 章":"BATTLE REPORT",final?"大结局 · 万家回灯":won?stage.name+"守住了":"城门失守",html+(won?"<p>"+(g.clearedSupplies===g.supplies.length?"✦ 获得本章全清勋章":"物资清理 "+g.clearedSupplies+" / "+g.supplies.length)+"</p>":""),actions);
   }
   function journal(){
-    dialog("journal","CAMPAIGN ARCHIVE","晨钟纪事",'<div class="journal-summary">已守住 '+Object.keys(profile.records).length+' / 8 章</div><div id="chap-list"></div>',[["全部重来",confirmReset,"secondary"]]);const list=$("chap-list");
+    dialog("journal","CAMPAIGN ARCHIVE","晨钟纪事",'<div class="journal-summary">已守住 '+Object.keys(profile.records).length+' / '+chapters.length+' 章</div><div id="chap-list"></div>',[["全部重来",confirmReset,"secondary"]]);const list=$("chap-list");
     chapters.forEach((s,i)=>{const locked=i>profile.unlocked,cleared=!!profile.records[i],row=make("div","chapter-row"+(locked?" locked":""));
+      if(!i||s.leg===0){const h=make("h3","province-name");h.textContent=s.province?.name||"晨钟纪事";list.append(h)}
       row.innerHTML='<span class="chapter-index">'+fmt(i+1)+'</span><div><h3>'+s.name+'</h3><p>'+s.waves+' 波 · '+(locked?"前章通关后解锁":s.subtitle)+(profile.records[i]?.salvaged?" · ✦ 全清勋章":"")+'</p></div>';
       const action=btn(locked?"未解锁":cleared?"回顾":i===profile.chapter?"阅读":"进入","secondary",()=>{if(!cleared&&i!==profile.chapter){switchChapter(i);return}
-        const ending=cleared&&i===7;dialog("story",ending?"EPILOGUE":"CHAPTER "+fmt(i+1),ending?"大结局 · 山谷回响":s.subtitle,'<div class="chapter-prose">'+para(s.brief)+(cleared?para(s.after):"")+'</div>',cleared?[["重玩本章",()=>switchChapter(i)],["返回纪事",journal,"secondary"]]:[["返回战场",closeDialog],["返回纪事",journal,"secondary"]])});
+        const ending=cleared&&i===chapters.length-1;dialog("story",ending?"EPILOGUE":"CHAPTER "+fmt(i+1),ending?"大结局 · 万家回灯":s.subtitle,'<div class="chapter-prose">'+para(s.brief)+(cleared?para(s.after):"")+'</div>',cleared?[["重玩本章",()=>switchChapter(i)],["返回纪事",journal,"secondary"]]:[["返回战场",closeDialog],["返回纪事",journal,"secondary"]])});
       action.disabled=locked;row.append(action);list.append(row)});
   }
   function shop(){dialog("shop","RAVEN TRADING POST","渡鸦商店",'<div class="shop-wallet"><div><small>旅行钱包</small><strong id="bank"></strong></div><i data-icon="coins"></i></div><p class="shop-note">每章守城成功，剩余军费全额转入钱包。首次通关另有赏金。</p><div class="shop-tabs"><button data-tab="card">战术卡牌</button><button data-tab="skin">守卫装扮</button></div><div id="wares"></div><p id="shop-feedback" role="status"></p>',[[g.ended?"返回战报":"返回战场",g.ended?outcome:closeDialog]]);
@@ -214,8 +256,10 @@
   function pause(){if(modal||g.ended)return;g.paused=!g.paused;save();dirty=true;update()}
   $("pause").onclick=pause;$("battle-nav").onclick=()=>{if(modal)closeDialog();$("map-area").scrollIntoView({block:"nearest"})};
   $("shop-btn").onclick=$("cards-store").onclick=shop;$("chapters-btn").onclick=$("read-journal").onclick=journal;
-  $("help").onclick=()=>dialog("help","FIELD MANUAL","守城指南","<p><b>建造与战斗</b>　选择工坊中的塔，点击沙盘里的 ＋ 建造。点击已有防御塔可升级或拆除。每波手动开始。</p><p><b>观察战场</b>　点击「前线近景」可到阿遥身边观看交战，再点一次返回全图。拖动调整视角。「角色图鉴」可旋转、放大五名角色与三类防御塔，观看角色动作。</p><p><b>商店与手牌</b>　旅行钱包初始有 80 金币，另赠一张寒潮敕令。守住一章后，剩余军费存入钱包，可跨关购买卡牌和永久装扮。战术手牌点击即用。</p><p><b>战役存档</b>　每一章都有独立军费和防线。在同一浏览器打开同一文件，可接续上次战役；恢复战斗时点「继续」。战役纪事可回看剧情和重玩已解锁章节。</p>",[["返回战场",closeDialog]]);
+  $("help").onclick=()=>dialog("help","FIELD MANUAL","守城指南","<p><b>建造与战斗</b>　全屏时先点沙盘里的 ＋，再选塔型。普通视图也可以先在工坊选塔。点击已有防御塔可升级或拆除。每波手动开始。</p><p><b>观察战场</b>　点击「前线近景」可到阿遥身边观看交战，再点一次返回全图。拖动调整视角。「角色图鉴」可旋转、放大五名角色与三类防御塔，观看角色动作。</p><p><b>商店与手牌</b>　旅行钱包初始有 80 金币，另赠一张寒潮敕令。守住一章后，剩余军费存入钱包，可跨关购买卡牌和永久装扮。战术手牌点击即用。</p><p><b>战役存档</b>　每一章都有独立军费和防线。在同一浏览器打开同一文件，可接续上次战役；恢复战斗时点「继续」。战役纪事可回看剧情和重玩已解锁章节。</p>",[["返回战场",closeDialog]]);
   $("supply-orders").onclick=supplyOrders;
+  $("battle-menu").onclick=battleMenu;
+  window.addEventListener("pine-rotate-hint",()=>msg("将手机横过来，即可横屏布防"));
   $("restart").onclick=()=>dialog("restart","RETRY CHAPTER","重新开始「"+stage.name+"」？","<p>回到第一波前重新布防，城门生命和本关军费恢复初始值。旅行钱包、剩余手牌、装扮和已解锁章节会保留。</p>",[["本局重来",restartChapter],["取消",closeDialog,"secondary"],["全部重来",confirmReset,"secondary"]]);
   $("close").onclick=closeDialog;$("dialog").addEventListener("cancel",e=>{e.preventDefault();closeDialog()});
   document.addEventListener("keydown",e=>{if(modal||e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;if(["1","2","3"].includes(e.key))choose(Object.keys(towers)[+e.key-1]);if(e.key.toLowerCase()==="x")$("speed").click();if(e.code==="Space"&&!e.target.closest?.("#restart,#sound")){e.preventDefault();pause()}if(e.key==="Escape")choose(choice)});
