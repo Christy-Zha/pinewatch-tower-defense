@@ -14,13 +14,16 @@
     g.pads=g.pads.slice(0,g.fixedSites).concat(extra);
     g.cleared=new Set(Array.isArray(s.cleared)?s.cleared:[]);
     for(const f of fields)if(s[f]!==undefined)g[f]=s[f];
+    const c=s.camp;
+    if(c&&["wood","stone","people","loggers","level","shortfall"].every(k=>Number.isSafeInteger(c[k])&&c[k]>=0)&&
+        c.people>=3&&c.people<=6&&c.loggers<=c.people&&c.level>=1&&c.level<=3)g.camp={...c};
     g.towers=Array.from({length:g.pads.length},(_,i)=>s.towers[i]||null);
     g.supplyHealth=g.supplies.map((c,i)=>Number.isFinite(s.supplyHealth?.[i])?Math.max(0,Math.min(c.hp,s.supplyHealth[i])):c.hp);
     g.markedSupply=g.supplyHealth[s.markedSupply]>0?s.markedSupply:null;
     g.paused=s.phase==="fight";return true;
   }
   function save(p,g){
-    const state={supplyHealth:g.supplyHealth,markedSupply:g.markedSupply,customSites:g.pads.slice(g.fixedSites),cleared:[...g.cleared]};for(const f of fields)state[f]=g[f];
+    const state={camp:g.camp,supplyHealth:g.supplyHealth,markedSupply:g.markedSupply,customSites:g.pads.slice(g.fixedSites),cleared:[...g.cleared]};for(const f of fields)state[f]=g[f];
     p.run={chapter:p.chapter,state,payout:p.run?.payout||null};
     try{
       const raw=localStorage.getItem(key);let stored;

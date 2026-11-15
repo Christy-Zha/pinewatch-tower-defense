@@ -165,6 +165,24 @@
     render(g,selected,choice,hover){
       this.begin();
       const effect=new Mesh();
+      const [fx,fz]=g.furnaceSite,level=g.camp.level;
+      this.drawData(this.model("camp-furnace/"+level,m=>{
+        m.frustum(0,0,0,5.4,4.9,2.4,8,"#696a61");
+        m.frustum(0,2.4,0,4.5,3.8,6+level,8,"#7f5240");
+        m.frustum(0,8+level,0,4.2,3.8,1.4,8,"#b89260");
+        for(let n=0;n<level;n++)m.box(-3+n*3,9+level,0,1.8,3.8,2,"#675246");
+        m.box(0,4,3.9,3.8,3,.7,"#392f28");
+      }),fx,1,fz);
+      const flicker=g.cold ? .6 : 1+Math.sin(g.time*6)*.12;
+      effect.frustum(fx,10+level,fz,g.cold?1:2.4,0,6*flicker,5,g.cold?"#d89366":"#ffbf58");
+      effect.box(fx,5,fz+4.3,2.8,2.4,.5,g.cold?"#806052":"#ffc45b");
+      if(g.phase==="fight"&&g.wave%3===0){
+        for(let i=0;i<42;i++){
+          const x=8+(i*137+g.time*27)%460,z=20+(i*83+g.time*6)%235;
+          const height=35-((i*17+g.time*16)%32);
+          effect.box(x,height,z,.65,.95,1.8,"#e1eef0",.75);
+        }
+      }
       if(this.buildPreview)effect.ring(this.buildPreview[0],this.buildPreview[1],9,1.3,"#ffe29b",1.8);
       g.supplies.forEach((c,j)=>{
         if(!g.supplyHealth[j])return;

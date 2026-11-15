@@ -22,6 +22,7 @@
   const levelStats=(type,level)=>{const t=towers[type];return {range:t.range+(level-1)*5,damage:Math.round(t.damage*(1+.65*(level-1))),delay:t.delay/(1+.12*(level-1))}};
   const upgradeCost=t=>Math.round(towers[t.type].cost*(t.level===1?.8:1.2));
   const waveReward=wave=>15+wave*2;
+  const newCamp=()=>({wood:9,stone:0,people:3,loggers:2,level:1,shortfall:0});
   function arrowDamage(enemy,damage){
     const armored=enemy.type==="brute"||enemy.type==="boss";
     return armored&&!enemy.slow&&!enemy.frozen?damage*.45:damage;
@@ -34,9 +35,30 @@
       const post=this.point(Math.min(67,this.length*.12));
       this.post=stage?.post||[post.x+Math.cos(post.yaw)*13,post.y-Math.sin(post.yaw)*13];this.reset();
     }
-    reset(){this.cleared=new Set();this.pads.length=this.fixedSites;this.supplyHealth=this.supplies.map(c=>c.hp);this.markedSupply=null;this.gold=this.stage?.gold??180;this.health=20;this.wave=0;this.kills=0;this.phase="ready";this.paused=false;this.speed=1;this.towers=this.pads.map(()=>null);this.enemies=[];this.shots=[];this.particles=[];this.queue=[];this.spawnIn=0;this.time=0;this.defeated=0;this.serial=0;this.waveSize=0;this.ranger={x:this.post[0],z:this.post[1],yaw:-.25,target:null,cycle:0,released:false}}
+    reset(){this.camp=newCamp();this.cleared=new Set();this.pads.length=this.fixedSites;this.supplyHealth=this.supplies.map(c=>c.hp);this.markedSupply=null;this.gold=this.stage?.gold??180;this.health=20;this.wave=0;this.kills=0;this.phase="ready";this.paused=false;this.speed=1;this.towers=this.pads.map(()=>null);this.enemies=[];this.shots=[];this.particles=[];this.queue=[];this.spawnIn=0;this.time=0;this.defeated=0;this.serial=0;this.waveSize=0;this.ranger={x:this.post[0],z:this.post[1],yaw:-.25,target:null,cycle:0,released:false}}
     get ended(){return this.phase==="won"||this.phase==="lost"}
     get fixedSites(){return this.baseSites+this.supplies.length}
+    campForecast(wave){
+      const c=this.camp,storm=wave>0&&wave%3===0;
+      const fuel=storm?10+2*Math.floor(wave/9)-2*(c.level-1):2;
+      return {storm,fuel,wood:c.loggers*2,stone:(c.people-c.loggers)*2};
+    }
+    get cold(){return this.phase==="fight"&&this.wave%3===0&&this.camp.shortfall>0}
+    get furnaceSite(){const [x,z]=this.path.at(-1);return [x-12,z+15]}
+    get furnaceCost(){return {wood:4*this.camp.level,stone:6*this.camp.level}}
+    assignLoggers(n){
+      if(this.phase!=="ready"||!Number.isInteger(n)||n<0||n>this.camp.people||n===this.camp.loggers)return false;
+      this.camp.loggers=n;this.onEvent("camp");return true;
+    }
+    upgradeFurnace(){
+      const c=this.camp,cost=this.furnaceCost;
+      if(this.phase!=="ready"||c.level>=3||c.wood<cost.wood||c.stone<cost.stone)return false;
+      c.wood-=cost.wood;c.stone-=cost.stone;c.level++;this.onEvent("camp");return true;
+    }
+    collectFuel(amount){
+      const c=this.camp,paid=Math.min(amount,c.shortfall);
+      c.shortfall-=paid;c.wood+=amount-paid;
+    }
     placementError(x,z){
       if(!Number.isFinite(x)||!Number.isFinite(z)||!this.terrain)return "请选择战场空地";
       const blocked=this.terrain.landError(x,z);
@@ -54,7 +76,9 @@
     clearProp(id){
       const p=this.terrain?.props.find(o=>o.id===id);
       if(!p||this.ended||this.cleared.has(id)||this.gold<p.cost)return false;
-      this.gold-=p.cost;this.cleared.add(id);this.onEvent("landClear");return true;
+      this.gold-=p.cost;this.cleared.add(id);
+      if(p.kind==="tree")this.collectFuel(4);else this.camp.stone+=3;
+      this.onEvent("landClear");return true;
     }
     get clearedSupplies(){return this.supplyHealth.filter(hp=>hp===0).length}
     markSupply(j){
@@ -68,6 +92,9 @@
     start(){
       if(this.phase!=="ready"||this.paused)return false;
       const counts={...this.waves[this.wave]};this.wave++;this.phase="fight";this.queue=[];this.defeated=0;
+      const supply=this.campForecast(this.wave),available=this.camp.wood+supply.wood;
+      this.camp.wood=Math.max(0,available-supply.fuel);this.camp.stone+=supply.stone;
+      this.camp.shortfall=supply.storm?Math.max(0,supply.fuel-available):0;
       const boss=counts.boss||0;delete counts.boss;
       const formation=this.stage?.formations?.[this.wave-1];
       const wolves=formation==="pack"?counts.runner:0;
@@ -146,7 +173,8 @@
       }
       for(const e of this.enemies){if(e.poison>0){e.hp-=Math.min(dt,e.poison)*e.toxin;e.poison=Math.max(0,e.poison-dt);if(!e.poison)e.toxin=0}e.slow=Math.max(0,e.slow-dt);e.frozen=Math.max(0,(e.frozen||0)-dt);if(!e.frozen)e.d+=units[e.type].speed*(e.slow>0?.55:1)*dt;Object.assign(e,this.point(e.d))}
       this.aimRanger(dt);
-      for(let i=0;i<this.towers.length;i++){const t=this.towers[i];if(!t)continue;t.cd=Math.max(0,t.cd-dt);if(t.cd>0)continue;
+      const towerTime=this.cold?dt*.8:dt;
+      for(let i=0;i<this.towers.length;i++){const t=this.towers[i];if(!t)continue;t.cd=Math.max(0,t.cd-towerTime);if(t.cd>0)continue;
         const stats=levelStats(t.type,t.level),[x,y]=this.pads[i];let target=null;
         if(this.markedSupply!==null&&this.clearSupply(i,t,stats)){t.cd=stats.delay;continue}
         let priority=-Infinity;
@@ -165,11 +193,17 @@
       for(const s of this.shots)s.ttl-=dt;this.shots=this.shots.filter(s=>s.ttl>0);
       if(this.health<=0){this.phase="lost";this.onEvent("lost")}
       else if(!this.enemies.length&&!this.queue.length){
+        const before=this.camp.people,gate=this.health;
+        if(this.wave%3===0&&!this.cold){
+          this.camp.people=Math.min(6,this.camp.people+1);
+          this.health=Math.min(20,this.health+this.camp.level-1);
+        }
+        this.camp.shortfall=0;
         this.shots=[];this.particles=[];this.phase=this.wave===this.waves.length?"won":"ready";
         if(this.phase==="ready")this.gold+=waveReward(this.wave);
-        this.onEvent(this.phase==="won"?"won":"cleared");
+        this.onEvent(this.phase==="won"?"won":"cleared",{rescued:this.camp.people-before,repaired:this.health-gate});
       }
     }
   }
-  window.PineGame={Battle,towers,units,waves,levelStats,upgradeCost,waveReward};
+  window.PineGame={Battle,towers,units,waves,levelStats,upgradeCost,waveReward,newCamp};
 })();

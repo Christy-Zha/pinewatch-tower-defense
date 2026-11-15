@@ -105,10 +105,34 @@
     const top=p.top-h-gap>=gap?p.top-h-gap:Math.min(p.bottom+gap,frameHeight-h-gap);
     d.style.setProperty("--site-x",Math.max(gap,left)+"px");d.style.setProperty("--site-y",Math.max(gap,top)+"px");
   }
+  function winterCamp(){
+    const c=g.camp,ready=g.phase==="ready",n=ready?g.wave+1:g.wave;
+    const supply=g.campForecast(n),stormWave=Math.ceil(n/3)*3,cost=g.furnaceCost;
+    let weather;
+    if(ready&&supply.storm){
+      const gap=Math.max(0,supply.fuel-c.wood-supply.wood);
+      weather="第 "+n+" 波暴风雪 · 需 "+supply.fuel+" 木。"+(gap?"按当前分工还差 "+gap+" 木。":"现有储备加本次采伐足够供暖。");
+    }else if(!ready&&supply.storm&&!g.ended)weather=g.cold?"炉火微弱 · 还需 "+c.shortfall+" 木。砍树可立即补燃料。":"暴风雪中 · 熔炉正在给防线供暖。";
+    else weather=g.ended?"本章守城已结束。":stormWave<=g.waves.length?"第 "+stormWave+" 波预计有暴风雪，需 "+g.campForecast(stormWave).fuel+" 木。":"余下波次天气平稳。";
+    dialog("camp",stage.name+" · 第 "+n+" 波","守夜营地",
+      '<div class="camp-stock"><span>木材 <b>'+c.wood+'</b></span><span>石料 <b>'+c.stone+'</b></span><span>幸存者 <b>'+c.people+'</b></span></div>'+
+      '<p class="camp-weather">'+weather+'</p><div class="camp-jobs"><b>伐木 '+c.loggers+' 人　·　采石 '+(c.people-c.loggers)+' 人</b><div id="camp-shifts"></div></div>'+
+      '<p>'+(ready?'开波收获 '+supply.wood+' 木、'+supply.stone+' 石。':'分工与升级在波间整备时开放。')+' 平时最多烧 2 木，暴风雪缺柴时，全场防御塔射速降低 20%。</p>'+
+      '<div class="camp-upgrade"><b>守夜熔炉　'+c.level+' 级</b><span>每升一级，风雪少耗 2 木。供暖过关时，二级炉修复 1 点城门生命，三级炉修复 2 点。</span><div id="camp-forge"></div></div>'+
+      '<p>守住供暖的风雪波，可接纳 1 名幸存者上岗采石，最多 6 人。进入新章会另建营地。</p>',
+      [["返回战场",closeDialog]]);
+    for(const [name,d] of [["转去伐木",1],["转去采石",-1]]){
+      const b=btn(name,"secondary",()=>{if(g.assignLoggers(c.loggers+d))winterCamp()});
+      b.disabled=!ready||c.loggers+d<0||c.loggers+d>c.people;$("camp-shifts").append(b);
+    }
+    const up=btn(c.level===3?"熔炉已满级":"升级 · "+cost.wood+" 木 / "+cost.stone+" 石","secondary",()=>{if(g.upgradeFurnace()){sound.play("upgrade");winterCamp()}});
+    up.disabled=!ready||c.level>=3||c.wood<cost.wood||c.stone<cost.stone;$("camp-forge").append(up);
+  }
   function battleMenu(){
     dialog("battle-menu","第 "+chapterNo()+" 关 · "+stage.region,stage.name,'<div class="field-menu"></div>');
     const menu=$("dialog-body").firstElementChild;
     const entry=(name,fn)=>menu.append(btn(name,"secondary",fn));
+    entry("守夜营地",winterCamp);
     if(!g.ended)entry(g.paused?"继续战斗":"暂停战斗",()=>{closeDialog();pause()});
     entry("战术手牌",()=>{
       dialog("cards","战场指令","战术手牌",'<div class="field-menu"></div>');
@@ -149,7 +173,8 @@
     if(e==="won"){P.settle(profile,g);save();outcome();return}if(e==="lost"){save();outcome();return}
     if(e==="leak")msg("敌军突破城门");
     if(e==="salvage"){msg(type.name+"已清除　+"+type.gold+" 军费 · 新塔位已开放");sound.play("purchase")}
-    if(e==="cleared")msg("击退第 "+g.wave+" 波　+"+PineGame.waveReward(g.wave)+" 军费");
+    if(e==="start"&&g.wave%3===0)msg(g.cold?"暴风雪来袭 · 砍树补足 "+g.camp.shortfall+" 木可恢复射速":"暴风雪来袭 · 熔炉供暖中");
+    if(e==="cleared")msg("击退第 "+g.wave+" 波　+"+PineGame.waveReward(g.wave)+" 军费"+(type?.rescued?" · 收留 1 名幸存者":"")+(type?.repaired?" · 修复 "+type.repaired+" 点城门生命":""));
     if(e==="kill"||e==="leak")return;
     save();update();
   }
@@ -170,6 +195,9 @@
   const handButtons=cardIds.map(id=>{const b=make("button","hand-card "+id);b.dataset.card=id;b.innerHTML='<i data-icon="'+items[id].sigil+'"></i><span>'+items[id].name+'</span><small></small>';b.title=items[id].desc;
     b.onclick=()=>{if(!P.use(profile,g,id))return;save();update();dirty=true;sound.play("card");msg(items[id].name+" 已生效");$("map-area").animate?.([{filter:"brightness(1.3)"},{filter:"brightness(1)"}],{duration:330})};$("hand").append(b);return b});
   function update(){
+    const nextStorm=!g.ended&&(g.phase==="ready"?g.wave+1:g.wave)%3===0;
+    $("camp-open").textContent=g.cold?"缺柴 "+g.camp.shortfall:nextStorm?(g.phase==="ready"?"风雪将至":"供暖中"):"营地";
+    $("camp-open").classList.toggle("storm-alert",nextStorm);
     $("health").textContent=g.health;$("gold").textContent=g.gold;$("wave").textContent=g.wave;
     $("phase").textContent=g.paused?"已暂停":({ready:"整备阶段",fight:"敌军来袭",won:"守城成功",lost:"城门失守"})[g.phase];$("phase").parentNode.classList.toggle("active",g.phase==="fight"&&!g.paused);
     $("start").disabled=!g.ended&&(g.phase!=="ready"||g.paused);$("start").querySelector("span").textContent=g.ended?"查看战报":g.phase==="ready"?"开始第 "+(g.wave+1)+" 波":"第 "+g.wave+" 波进行中";
@@ -200,6 +228,8 @@
     if(g.ended||modal||performance.now()<blockClick||e.target.closest("button,.camera-bar,.scene-meta"))return;
     const pos=PineRenderer.inputPoint(e),rect=$("field").getBoundingClientRect(),sideways=document.documentElement.classList.contains("sideways-battle");
     const px=(pos.x-(sideways?rect.top:rect.left))*renderer.dpr,py=(pos.y-(sideways?innerWidth-rect.right:rect.top))*renderer.dpr;
+    const [fx,fz]=g.furnaceSite,[fireX,fireY]=renderer.project(fx,6,fz);
+    if(Math.hypot(px-fireX,py-fireY)<Math.max(8*renderer.dpr,6*renderer.scale)){winterCamp();return}
     let hit=null,best=Infinity;
     for(const p of g.terrain.props){
       const [x,y]=renderer.project(p.x,0,p.z),[,top]=renderer.project(p.x,p.h,p.z);
@@ -209,7 +239,7 @@
     }
     if(hit){
       const tree=hit.kind==="tree",name=tree?"树木":"石块";
-      dialog("terrain","清理场地",tree?"移除树木":"清除石块","<p>花费 "+hit.cost+" 军费清除这处"+name+"。当前有 "+g.gold+" 军费。</p>",[["取消",closeDialog,"secondary"],["清除 · "+hit.cost+" 军费",()=>{if(g.clearProp(hit.id)){closeDialog();draw();msg(name+"已清除")}}]]);
+      dialog("terrain","清理场地",tree?"移除树木":"清除石块","<p>花费 "+hit.cost+" 军费清除这处"+name+"，获得 "+(tree?"4 木材":"3 石料")+"。当前有 "+g.gold+" 军费。</p>",[["取消",closeDialog,"secondary"],["清除 · "+hit.cost+" 军费",()=>{if(g.clearProp(hit.id)){closeDialog();draw();msg(tree?"树木已清除 · 获得 4 木材":"石块已清除 · 获得 3 石料")}}]]);
       $("dialog-actions").lastElementChild.disabled=g.gold<hit.cost;return;
     }
     const point=renderer.ground(px,py),reason=g.placementError(...point);
@@ -300,6 +330,7 @@
   $("shop-btn").onclick=$("cards-store").onclick=shop;$("chapters-btn").onclick=$("read-journal").onclick=journal;
   $("help").onclick=()=>dialog("help","FIELD MANUAL","守城指南","<p><b>建造与战斗</b>　点路旁空地自由建塔，或使用 ＋ 基座。点树木或石块可花军费清除。普通视图也可以先在工坊选塔。点击已有防御塔可升级或拆除。每波手动开始。</p><p><b>观察战场</b>　点击「前线近景」可到阿遥身边观看交战，再点一次返回全图。拖动调整视角。「角色图鉴」可旋转、放大五名角色与六类防御塔，观看角色动作。</p><p><b>商店与手牌</b>　旅行钱包初始有 80 金币，另赠一张寒潮敕令。守住一章后，剩余军费存入钱包，可跨关购买卡牌和永久装扮。战术手牌点击即用。</p><p><b>战役存档</b>　每一章都有独立军费和防线。在同一浏览器打开同一文件，可接续上次战役；恢复战斗时点「继续」。战役纪事可回看剧情和重玩已解锁章节。</p>",[["返回战场",closeDialog]]);
   $("supply-orders").onclick=supplyOrders;
+  $("camp-open").onclick=winterCamp;
   $("battle-menu").onclick=battleMenu;
   $("restart").onclick=()=>dialog("restart","RETRY CHAPTER","重新开始「"+stage.name+"」？","<p>回到第一波前重新布防，城门生命和本关军费恢复初始值。旅行钱包、剩余手牌、装扮和已解锁章节会保留。</p>",[["本局重来",restartChapter],["取消",closeDialog,"secondary"],["全部重来",confirmReset,"secondary"]]);
   $("close").onclick=closeDialog;$("dialog").addEventListener("cancel",e=>{e.preventDefault();closeDialog()});

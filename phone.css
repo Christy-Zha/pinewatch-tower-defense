@@ -125,7 +125,7 @@ html.battle-expanded #battle-shell .map-frame,
 html.battle-expanded #battle-shell .map-area {display:block;position:relative;width:100%;height:100%;margin:0;border:0;border-radius:0}
 html.battle-expanded #battle-shell .layout aside,
 html.battle-expanded #battle-shell .board>.panel-head>.section-title,
-html.battle-expanded #battle-shell .board-actions>:not(#battle-menu),
+html.battle-expanded #battle-shell .board-actions>:not(#battle-menu):not(#camp-open),
 html.battle-expanded #battle-shell .controls #restart,
 html.battle-expanded #battle-shell .controls #pause,
 html.battle-expanded #battle-shell .combat-progress {display:none}
@@ -206,3 +206,14 @@ html.sideways-battle #dialog[data-kind=site] #dialog-title {font-size:20px}
 html.sideways-battle .studio-stage {height:min(58dvw,300px);min-height:125px}
 html.sideways-battle .phone-tools {display:inline-flex;bottom:max(7px,var(--battle-b));right:calc(94px + var(--battle-r))}
 html.sideways-battle .map-area.show-tools .camera-bar {bottom:55px;right:max(8px,var(--battle-r))}
+
+#camp-open {min-height:36px;padding:0 10px;border:1px solid #8d805e;border-radius:7px;background:#283329ed;color:#f5d69b;font:600 13px system-ui;cursor:pointer}
+.phone-battle #camp-open {min-height:44px}
+#camp-open.storm-alert {color:#d1edff;background:#244457;border-color:#83acbb}
+.camp-stock,.camp-jobs,.camp-upgrade {border:1px solid #50614e;border-radius:7px;padding:9px 12px}
+.camp-stock {display:flex;justify-content:space-between;gap:8px;background:#263a2d}
+.camp-stock b {color:#f1cd88;font-size:17px}
+#dialog .camp-weather {margin:9px 0;color:#c8e6f0}
+.camp-jobs,.camp-upgrade {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.camp-upgrade {margin-top:8px}.camp-upgrade span {font-size:12px}
+#camp-shifts {display:flex;gap:5px}#camp-shifts button,#camp-forge button {min-height:40px}
