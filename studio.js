@@ -22,8 +22,8 @@
       this.section.querySelector("[data-zoom]").onclick=e=>{this.bust=!this.bust;e.currentTarget.textContent=this.bust?"全身":"放大";this.paint()};
       this.section.querySelector(".model-action").onclick=()=>{this.alt=!this.alt;this.paused=false;this.time=0;this.labels();this.paint()};
       const canvas=this.view.canvas;let pointer=null;
-      canvas.onpointerdown=e=>{pointer={id:e.pointerId,x:e.clientX,y:e.clientY,a:this.view.angle,p:this.view.pitch};canvas.setPointerCapture(e.pointerId)};
-      canvas.onpointermove=e=>{if(pointer?.id!==e.pointerId)return;this.view.angle=pointer.a-(e.clientX-pointer.x)*.017;this.view.pitch=Math.max(-.18,Math.min(.85,pointer.p+(e.clientY-pointer.y)*.008));this.paint()};
+      canvas.onpointerdown=e=>{pointer={id:e.pointerId,...PineRenderer.inputPoint(e),a:this.view.angle,p:this.view.pitch};canvas.setPointerCapture(e.pointerId)};
+      canvas.onpointermove=e=>{if(pointer?.id!==e.pointerId)return;const pos=PineRenderer.inputPoint(e);this.view.angle=pointer.a-(pos.x-pointer.x)*.017;this.view.pitch=Math.max(-.18,Math.min(.85,pointer.p+(pos.y-pointer.y)*.008));this.paint()};
       canvas.onpointerup=canvas.onpointercancel=()=>{pointer=null};
       const roster=this.section.querySelector(".model-roster");
       for(const [id,v] of Object.entries(models)){const b=document.createElement("button");b.textContent=v.name;b.dataset.id=id;b.onclick=()=>this.select(id);roster.append(b)}

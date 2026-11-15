@@ -20,12 +20,11 @@
   tools.addEventListener('click',()=>setTools(!map.classList.contains('show-tools')));
   camera.addEventListener('click',e=>{if(e.target.closest('#frontline,#cam-home'))setTools(false)});
   phone.addEventListener('change',()=>{setTools(false);if(!phone.matches&&shell.dataset.dock==='intel')setDock('armory')});
-  portrait.addEventListener('change',()=>document.getElementById('cam-home').click());
   const outside=[document.querySelector('.topbar'),document.querySelector('.journal-strip'),document.querySelector('footer')];
   const enterIcon='M3 7V3h4m6 0h4v4m0 6v4h-4m-6 0H3v-4';
   const exitIcon='M3 7h4V3m6 0v4h4m0 6h-4v4m-6 0v-4H3';
   const factor=1.24;
-  const landscapePhone=matchMedia('(orientation:landscape) and (max-height:580px) and (pointer:coarse)');
+  const handset=matchMedia('(max-width:600px) and (orientation:portrait) and (any-pointer:coarse), (max-height:580px) and (orientation:landscape) and (any-pointer:coarse)');
   async function nativeScreen(){
     try{
       if(!document.fullscreenElement)await document.documentElement.requestFullscreen();
@@ -36,11 +35,10 @@
   function setExpanded(on){
     if(on)expand.before(sound);else utilities.prepend(sound);
     document.documentElement.classList.toggle('battle-expanded',on);
-    const wide=on&&landscapePhone.matches;
-    if(document.documentElement.classList.contains('phone-battle')!==wide){
-      document.documentElement.classList.toggle('phone-battle',wide);
-      window.dispatchEvent(new Event('pine-field-layout'));
-    }
+    const wide=on&&handset.matches;
+    document.documentElement.classList.toggle('phone-battle',wide);
+    document.documentElement.classList.toggle('sideways-battle',wide&&portrait.matches);
+    window.dispatchEvent(new Event('pine-field-layout'));
     for(const region of outside)region.inert=on;
     expand.setAttribute('aria-pressed',String(on));
     expand.querySelector('span').textContent=on?'退出全屏':'全屏';
@@ -61,12 +59,13 @@
 
   expand.addEventListener('click',()=>{
     const on=!inBattleView();setExpanded(on);
-    if(on){if(portrait.matches)window.dispatchEvent(new Event('pine-rotate-hint'));nativeScreen()}
+    if(on)nativeScreen();
   });
   window.addEventListener('pine-native-screen',nativeScreen);
   document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&inBattleView())setExpanded(false)});
-  landscapePhone.addEventListener('change',e=>{if(e.matches||inBattleView())setExpanded(e.matches)});
-  if(landscapePhone.matches)setExpanded(true);
+  handset.addEventListener('change',e=>{if(e.matches||inBattleView())setExpanded(e.matches)});
+  portrait.addEventListener('change',()=>{if(inBattleView())setExpanded(true);else document.getElementById('cam-home').click()});
+  if(handset.matches)setExpanded(true);
   document.getElementById('cam-zoom-in').addEventListener('click',()=>zoom(factor));
   document.getElementById('cam-zoom-out').addEventListener('click',()=>zoom(1/factor));
   for(const tab of dockButtons)tab.addEventListener('click',()=>setDock(tab.dataset.dockTab));

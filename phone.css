@@ -130,8 +130,8 @@ html.battle-expanded #battle-shell .controls #restart,
 html.battle-expanded #battle-shell .controls #pause,
 html.battle-expanded #battle-shell .combat-progress {display:none}
 html.battle-expanded #battle-shell .overview {
-  position:absolute;z-index:605;top:max(7px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));
-  width:auto;max-width:calc(100% - 103px - env(safe-area-inset-left) - env(safe-area-inset-right));min-height:35px;margin:0;
+  position:absolute;z-index:605;top:max(7px,var(--battle-t,env(safe-area-inset-top)));left:max(10px,var(--battle-l,env(safe-area-inset-left)));
+  width:auto;max-width:calc(100% - 103px - var(--battle-l,env(safe-area-inset-left)) - var(--battle-r,env(safe-area-inset-right)));min-height:35px;margin:0;
   display:flex;align-items:center;gap:10px;padding:4px 10px;border:1px solid #87936c77;border-radius:8px;background:#182a22ed;pointer-events:none
 }
 html.battle-expanded #battle-shell .heading .eyebrow {display:none}
@@ -139,18 +139,18 @@ html.battle-expanded #battle-shell .heading h1 {font-size:16px;letter-spacing:.0
 html.battle-expanded #battle-shell .hud {display:flex;gap:8px;width:auto;min-width:0;padding:0;margin:0;border:0;background:none}
 html.battle-expanded #battle-shell .metric {padding:0;min-height:0;border:0}
 html.battle-expanded #battle-shell .metric small {display:none}
-html.battle-expanded #battle-shell .board>.panel-head {position:absolute;z-index:605;top:max(6px,env(safe-area-inset-top));right:max(9px,env(safe-area-inset-right));left:auto;padding:0;border:0;background:none}
+html.battle-expanded #battle-shell .board>.panel-head {position:absolute;z-index:605;top:max(6px,var(--battle-t,env(safe-area-inset-top)));right:max(9px,var(--battle-r,env(safe-area-inset-right)));left:auto;padding:0;border:0;background:none}
 html.battle-expanded #battle-menu {display:inline-flex;align-items:center;gap:7px;height:44px;padding:0 13px;color:#f1d8a2;border:1px solid #91a08088;border-radius:8px;background:#1a2d24f2;font:600 14px system-ui;cursor:pointer}
 html.battle-expanded #battle-shell .controls {
-  position:absolute;bottom:max(7px,env(safe-area-inset-bottom));left:max(10px,env(safe-area-inset-left));z-index:601;
+  position:absolute;bottom:max(7px,var(--battle-b,env(safe-area-inset-bottom)));left:max(10px,var(--battle-l,env(safe-area-inset-left)));z-index:601;
   display:flex;gap:5px;min-height:0;padding:0;border:0;background:none;width:auto
 }
 html.battle-expanded #battle-shell .controls .play-controls {display:flex}
 html.battle-expanded #battle-shell .controls button {min-height:44px;padding:0 12px}
-html.battle-expanded .scene-meta {top:auto;left:auto;right:max(10px,env(safe-area-inset-right));bottom:max(7px,env(safe-area-inset-bottom))}
+html.battle-expanded .scene-meta {top:auto;left:auto;right:max(10px,var(--battle-r,env(safe-area-inset-right)));bottom:max(7px,var(--battle-b,env(safe-area-inset-bottom)))}
 html.battle-expanded .scene-meta .location,html.battle-expanded .phone-tools {display:none}
 html.battle-expanded #supply-orders {height:44px;border-radius:6px}
-html.battle-expanded .camera-bar {bottom:max(7px,env(safe-area-inset-bottom));right:calc(102px + env(safe-area-inset-right))}
+html.battle-expanded .camera-bar {bottom:max(7px,var(--battle-b,env(safe-area-inset-bottom)));right:calc(102px + var(--battle-r,env(safe-area-inset-right)))}
 html.battle-expanded .map-area #map-msg {bottom:58px}
 .site-choices,.field-menu {display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px}
 .site-choice {display:grid;place-items:center;gap:4px;padding:8px 4px;border:1px solid #667452;border-radius:7px;background:#2a392c;color:#f0e5cb;cursor:pointer}
@@ -178,6 +178,31 @@ html.battle-expanded .map-area #map-msg {bottom:58px}
   #dialog[data-kind=site] .site-choice {padding:3px;gap:1px}
   #dialog[data-kind=site] .site-choice canvas {height:34px;width:34px}
   #dialog[data-kind=site] #dialog-title {font-size:20px}
-  html.battle-expanded .phone-tools {display:inline-flex;bottom:max(7px,env(safe-area-inset-bottom));right:calc(94px + env(safe-area-inset-right))}
-  html.battle-expanded .map-area.show-tools .camera-bar {bottom:55px;right:max(8px,env(safe-area-inset-right))}
+  html.battle-expanded .phone-tools {display:inline-flex;bottom:max(7px,var(--battle-b,env(safe-area-inset-bottom)));right:calc(94px + var(--battle-r,env(safe-area-inset-right)))}
+  html.battle-expanded .map-area.show-tools .camera-bar {bottom:55px;right:max(8px,var(--battle-r,env(safe-area-inset-right)))}
 }
+
+/* Map the landscape play surface onto a portrait viewport when rotation is locked. */
+html.sideways-battle {
+  --battle-l:env(safe-area-inset-top,0px);--battle-r:env(safe-area-inset-bottom,0px);
+  --battle-t:env(safe-area-inset-right,0px);--battle-b:env(safe-area-inset-left,0px)
+}
+html.sideways-battle #battle-shell {
+  inset:0 auto auto 100%;width:100dvh;height:100dvw;
+  transform-origin:0 0;transform:rotate(90deg)
+}
+html.sideways-battle #dialog {
+  position:fixed;inset:50% auto auto 50%;margin:0;transform:translate(-50%,-50%) rotate(90deg);
+  width:min(510px,calc(100dvh - var(--battle-l) - var(--battle-r) - 22px));
+  max-width:none;max-height:calc(100dvw - var(--battle-t) - var(--battle-b) - 18px)
+}
+html.sideways-battle #dialog[data-kind=site] {
+  inset:var(--site-x,9px) auto auto calc(100dvw - var(--site-y,9px));
+  transform:rotate(90deg);transform-origin:0 0;width:min(385px,calc(100dvh - 18px))
+}
+html.sideways-battle #dialog[data-kind=site] .site-choice {padding:3px;gap:1px}
+html.sideways-battle #dialog[data-kind=site] .site-choice canvas {width:34px;height:34px}
+html.sideways-battle #dialog[data-kind=site] #dialog-title {font-size:20px}
+html.sideways-battle .studio-stage {height:min(58dvw,300px);min-height:125px}
+html.sideways-battle .phone-tools {display:inline-flex;bottom:max(7px,var(--battle-b));right:calc(94px + var(--battle-r))}
+html.sideways-battle .map-area.show-tools .camera-bar {bottom:55px;right:max(8px,var(--battle-r))}

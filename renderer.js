@@ -49,6 +49,10 @@
   }
   // The same view transform positions geometry and the accessible build-site buttons.
   class Renderer{
+    static inputPoint(e){
+      return document.documentElement.classList.contains("sideways-battle")
+        ? {x:e.clientY,y:innerWidth-e.clientX} : {x:e.clientX,y:e.clientY};
+    }
     constructor(canvas){
       this.canvas=canvas;this.stage=null;this.staticData=null;this.models=new Map();this.dirty=true;this.resetCamera();
       const gl=canvas.getContext("webgl",{alpha:true,antialias:true,premultipliedAlpha:true,preserveDrawingBuffer:false});

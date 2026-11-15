@@ -82,12 +82,16 @@
       art(type,b);const label=make("strong"),price=make("span");label.textContent=t.name;price.textContent=t.cost+" 军费";b.append(label,price);list.append(b);
     }
     positionSiteMenu(i);
+    $("dialog").dataset.site=i;
   }
   function positionSiteMenu(i){
-    const d=$("dialog"),p=pads[i].getBoundingClientRect(),gap=9;
+    const d=$("dialog"),rect=pads[i].getBoundingClientRect(),gap=9;
+    const sideways=document.documentElement.classList.contains("sideways-battle");
+    const p=sideways?{left:rect.top,width:rect.height,top:innerWidth-rect.right,bottom:innerWidth-rect.left}:rect;
+    const frameWidth=sideways?innerHeight:innerWidth,frameHeight=sideways?innerWidth:innerHeight;
     const w=d.offsetWidth,h=d.offsetHeight;
-    const left=Math.min(Math.max(gap,p.left+p.width/2-w/2),innerWidth-w-gap);
-    const top=p.top-h-gap>=gap?p.top-h-gap:Math.min(p.bottom+gap,innerHeight-h-gap);
+    const left=Math.min(Math.max(gap,p.left+p.width/2-w/2),frameWidth-w-gap);
+    const top=p.top-h-gap>=gap?p.top-h-gap:Math.min(p.bottom+gap,frameHeight-h-gap);
     d.style.setProperty("--site-x",Math.max(gap,left)+"px");d.style.setProperty("--site-y",Math.max(gap,top)+"px");
   }
   function battleMenu(){
@@ -186,13 +190,13 @@
       if(touches.size>=2){drag=null;pinchDistance=fingerDistance();for(const id of touches.keys())area.setPointerCapture(id);return}
     }
     blockClick=0;
-    drag={id:e.pointerId,x:e.clientX,y:e.clientY,a:renderer.angle,p:renderer.pitch,moved:false}
+    drag={id:e.pointerId,...PineRenderer.inputPoint(e),a:renderer.angle,p:renderer.pitch,moved:false}
   });
   area.addEventListener("pointermove",e=>{
     if(touches.has(e.pointerId))touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(pinchDistance&&touches.size<2)return;
     if(touches.size>=2){const distance=fingerDistance();if(pinchDistance>2&&distance>2)zoomMap(distance/pinchDistance);pinchDistance=distance;return}
-    if(!drag||drag.id!==e.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(!drag.moved&&Math.hypot(dx,dy)<6)return;
+    if(!drag||drag.id!==e.pointerId)return;const pos=PineRenderer.inputPoint(e),dx=pos.x-drag.x,dy=pos.y-drag.y;if(!drag.moved&&Math.hypot(dx,dy)<6)return;
     if(!drag.moved){area.setPointerCapture(e.pointerId);drag.moved=true}hover=null;renderer.angle=drag.a-dx*.009;renderer.pitch=Math.max(.43,Math.min(1.14,drag.p+dy*.006));dirty=true});
   function release(e){
     if(touches.delete(e.pointerId)&&pinchDistance){blockClick=performance.now()+220;if(!touches.size)pinchDistance=0;else if(touches.size>=2)pinchDistance=fingerDistance()}
@@ -263,11 +267,10 @@
   $("help").onclick=()=>dialog("help","FIELD MANUAL","守城指南","<p><b>建造与战斗</b>　全屏时先点沙盘里的 ＋，再选塔型。普通视图也可以先在工坊选塔。点击已有防御塔可升级或拆除。每波手动开始。</p><p><b>观察战场</b>　点击「前线近景」可到阿遥身边观看交战，再点一次返回全图。拖动调整视角。「角色图鉴」可旋转、放大五名角色与三类防御塔，观看角色动作。</p><p><b>商店与手牌</b>　旅行钱包初始有 80 金币，另赠一张寒潮敕令。守住一章后，剩余军费存入钱包，可跨关购买卡牌和永久装扮。战术手牌点击即用。</p><p><b>战役存档</b>　每一章都有独立军费和防线。在同一浏览器打开同一文件，可接续上次战役；恢复战斗时点「继续」。战役纪事可回看剧情和重玩已解锁章节。</p>",[["返回战场",closeDialog]]);
   $("supply-orders").onclick=supplyOrders;
   $("battle-menu").onclick=battleMenu;
-  window.addEventListener("pine-rotate-hint",()=>msg("将手机横过来，即可横屏布防"));
   $("restart").onclick=()=>dialog("restart","RETRY CHAPTER","重新开始「"+stage.name+"」？","<p>回到第一波前重新布防，城门生命和本关军费恢复初始值。旅行钱包、剩余手牌、装扮和已解锁章节会保留。</p>",[["本局重来",restartChapter],["取消",closeDialog,"secondary"],["全部重来",confirmReset,"secondary"]]);
   $("close").onclick=closeDialog;$("dialog").addEventListener("cancel",e=>{e.preventDefault();closeDialog()});
   document.addEventListener("keydown",e=>{if(modal||e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;if(["1","2","3"].includes(e.key))choose(Object.keys(towers)[+e.key-1]);if(e.key.toLowerCase()==="x")$("speed").click();if(e.code==="Space"&&!e.target.closest?.("#restart,#sound")){e.preventDefault();pause()}if(e.key==="Escape")choose(choice)});
   document.addEventListener("visibilitychange",()=>{stamp=0;if(document.hidden&&g.phase==="fight"){g.paused=true;update();save()}});window.addEventListener("pagehide",save);
-  new ResizeObserver(()=>{dirty=true;lastProjection=""}).observe(area);
+  new ResizeObserver(()=>{dirty=true;lastProjection="";if(modal==="site"){draw();positionSiteMenu(Number($("dialog").dataset.site))}}).observe(area);
   icons();PineSprites.emblem($("emblem").getContext("2d"));setup(true);requestAnimationFrame(animate);
 })();
