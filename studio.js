@@ -8,6 +8,9 @@
     boss:{name:"赤岩领主",role:"围城首领",text:"披着深色甲胄的重锤战士，胸前嵌着一块震动的钟片。",action:"挥锤"},
     arrow:{name:"游侠箭塔",role:"快速单体",text:"木制瞭望台架起弩机，为弯道提供连续火力。"},
     cannon:{name:"重装炮塔",role:"范围轰击",text:"铜箍固定着铸铁炮管，一发炮弹能击中聚集的敌人。"},
+    storm:{name:"引雷塔",role:"连锁闪电",text:PineGame.towers.storm.description},
+    venom:{name:"荆毒塔",role:"持续毒伤",text:PineGame.towers.venom.description},
+    ballista:{name:"破甲重弩",role:"远程破甲",text:PineGame.towers.ballista.description},
     frost:{name:"寒霜法塔",role:"冰霜控制",text:"石座支撑悬浮法晶，命中敌人时施加减速。"}
   };
   class FigureStudio{

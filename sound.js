@@ -68,12 +68,15 @@
       if(!this.enabled||document.hidden)return;
       if(!this.running){if(this.starting)this.pending=cue;return}
       const n=(...args)=>this.note(...args);
-      if(["ranger","arrow","frost","cannon"].includes(cue)){
+      if(["ranger","arrow","frost","cannon","storm","ballista","venom"].includes(cue)){
         const t=this.context.currentTime;if(t-this.lastShot<.085)return;this.lastShot=t;
       }
       switch(cue){
         case "ranger":case "arrow":
           n("triangle",840,165,.16,.30);n("sine",310,100,.11,.16,.012);break;
+        case "ballista": n("triangle",350,90,.21,.32);break;
+        case "venom": n("sine",510,155,.13,.17);break;
+        case "storm": n("sawtooth",460,100,.12,.12);break;
         case "cannon":
           n("triangle",198,42,.35,.48);n("sine",430,77,.12,.21);break;
         case "frost":

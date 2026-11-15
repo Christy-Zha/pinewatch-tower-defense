@@ -8,7 +8,11 @@
   }
   function restore(p,g){
     const r=p.run;if(!r||r.chapter!==p.chapter||!r.state)return false;const s=r.state;
-    if(!Number.isInteger(s.wave)||s.wave<0||s.wave>g.waves.length||!Array.isArray(s.towers)||![g.baseSites,g.pads.length].includes(s.towers.length)||!["fight","ready","lost","won"].includes(s.phase))return false;
+    const extra=s.customSites??[];
+    if(!Array.isArray(extra)||extra.some(p=>!Array.isArray(p)||p.length!==2||!p.every(Number.isFinite)))return false;
+    if(!Number.isInteger(s.wave)||s.wave<0||s.wave>g.waves.length||!Array.isArray(s.towers)||!(s.towers.length===g.fixedSites+extra.length||(!extra.length&&s.towers.length===g.baseSites))||!["fight","ready","lost","won"].includes(s.phase))return false;
+    g.pads=g.pads.slice(0,g.fixedSites).concat(extra);
+    g.cleared=new Set(Array.isArray(s.cleared)?s.cleared:[]);
     for(const f of fields)if(s[f]!==undefined)g[f]=s[f];
     g.towers=Array.from({length:g.pads.length},(_,i)=>s.towers[i]||null);
     g.supplyHealth=g.supplies.map((c,i)=>Number.isFinite(s.supplyHealth?.[i])?Math.max(0,Math.min(c.hp,s.supplyHealth[i])):c.hp);
@@ -16,7 +20,7 @@
     g.paused=s.phase==="fight";return true;
   }
   function save(p,g){
-    const state={supplyHealth:g.supplyHealth,markedSupply:g.markedSupply};for(const f of fields)state[f]=g[f];
+    const state={supplyHealth:g.supplyHealth,markedSupply:g.markedSupply,customSites:g.pads.slice(g.fixedSites),cleared:[...g.cleared]};for(const f of fields)state[f]=g[f];
     p.run={chapter:p.chapter,state,payout:p.run?.payout||null};
     try{
       const raw=localStorage.getItem(key);let stored;

@@ -177,7 +177,25 @@
     const base=model(m,x,z,0), head=model(m,x,z,yaw);
     if (type==="cannon") cannonTower(base,head,level,p);
     else if (type==="frost") frostTower(base,level,p);
-    else arrowTower(base,head,level,p);
+    else if(type==="storm"){
+      base.ring(0,0,0,9,7,4,8,"#49556a");
+      base.ring(0,4,0,5,2.8,17,8,"#484962");
+      for(let j=0;j<level+2;j++)base.ring(0,8+j*3,0,5.5,4.7,1.4,8,p.trim);
+      for(const s of [-1,1])beam(base,[s*3,12,0],[s*6,25,0],1.2,.45,5,p.trim);
+      gem(base,0,20,0,4.5,11,{gem:"#af76da",crystal:"#eed2ff",darkGem:"#70518b",tip:"#f8ebff"});
+    }else if(type==="venom"){
+      base.ring(0,0,0,8.7,7,3,7,"#675144");base.ring(0,3,0,5.5,3.5,12,7,"#755637");
+      for(let i=0;i<4;i++){const a=i*Math.PI/2;beam(base,[0,8,0],[7*Math.sin(a),20,7*Math.cos(a)],2.1,.45,5,"#658444")}
+      for(let i=0;i<level+1;i++){const a=2*Math.PI*i/(level+1);gem(base,3*Math.sin(a),14,3*Math.cos(a),3.4,9,{gem:"#72a844",crystal:"#c3dc60",darkGem:"#49613c",tip:"#f4e984"})}
+    }else if(type==="ballista"){
+      base.ring(0,0,0,9,8,3,8,"#8a8775");base.ring(0,3,0,6.3,4.1,9,6,"#705136");
+      head.box(0,13,0,4,3,19,"#7b5434");head.box(0,15,1,2,1,18,p.trim);
+      for(const s of [-1,1]){
+        beam(head,[0,14,3],[s*10,15,-1],1.7,.7,5,"#a27744");
+        beam(head,[s*10,15,-1],[0,15,-6],.25,.25,4,"#ded9b7");
+      }
+      for(let i=0;i<level;i++)beam(head,[(i-(level-1)/2)*1.5,16,-5],[(i-(level-1)/2)*1.5,16,12],.5,.3,5,"#cacbc0");
+    }else arrowTower(base,head,level,p);
   }
 
   function ear(g,x,y,z,sgn,color,size) {

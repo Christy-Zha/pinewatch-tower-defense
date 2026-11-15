@@ -71,10 +71,11 @@
       return upload(mesh.vertices,6);
     }
     release(o){if(o?.buf)this.gl.deleteBuffer(o.buf)}
-    set(stage,index,skin){
+    set(stage,index,skin,cleared){
       const wide=this.canvas.id==="field"&&document.documentElement.classList.contains("phone-battle");
-      if(this.stage===stage&&this.skin===skin&&this.wide===wide)return;
-      const m=new Mesh();PineScenery.build(m,stage,index,skin,wide);this.release(this.staticData);this.staticData=this.data(m);
+      if(this.stage===stage&&this.skin===skin&&this.wide===wide&&this.cleared===cleared&&this.clearCount===(cleared?.size||0))return;
+      this.cleared=cleared;this.clearCount=cleared?.size||0;
+      const m=new Mesh();this.terrain=PineScenery.build(m,stage,index,skin,wide,cleared);this.release(this.staticData);this.staticData=this.data(m);
       this.stage=stage;this.skin=skin;this.wide=wide;this.softwareCache=null;this.dirty=true;
       if(wide){
         const points=[...stage.path,...stage.pads,...stage.supplies.map(c=>[c.x,c.z]),stage.post];
@@ -108,6 +109,11 @@
     }
     project(x,y,z){
       x-=this.center[0];y-=this.center[1];z-=this.center[2];const front=x*this.sa+z*this.ca;return [this.w/2+(x*this.ca-z*this.sa)*this.scale,this.h*this.offset+(front*this.sp-y*this.cp)*this.scale,front*this.cp+y*this.sp];
+    }
+    ground(px,py){
+      const side=(px-this.w/2)/this.scale;
+      const front=((py-this.h*this.offset)/this.scale-this.center[1]*this.cp)/this.sp;
+      return [this.center[0]+side*this.ca+front*this.sa,this.center[2]-side*this.sa+front*this.ca];
     }
     drawData(data,x=0,y=0,z=0,yaw=0){
       if(!data)return;
@@ -143,7 +149,7 @@
     }
     finish(){if(!this.gl)this.ctx.putImageData(this.frame,0,0);this.dirty=false}
     character(id,pose,phase,skin,frozen=false,inBattle=false){
-      const isTower=["arrow","cannon","frost"].includes(id),frames=isTower?1:pose==="idle"?8:id==="ranger"?20:12;
+      const isTower=!!PineGame.towers[id],frames=isTower?1:pose==="idle"?8:id==="ranger"?20:12;
       const f=Math.floor((((phase%1)+1)%1)*frames+1e-7)%frames,key=["character",id,pose,f,skin,frozen,inBattle].join("/");
       return this.model(key,m=>{
         if(isTower)PineFigures.tower(m,id,0,0,2,skin);
@@ -152,13 +158,14 @@
       });
     }
     specimen(id,skin,pose,phase,yaw=0,bust=false){
-      const heights={ranger:31,scout:15,runner:12,brute:21,boss:28,arrow:33,cannon:25,frost:34},h=heights[id];
+      const heights={ranger:31,scout:15,runner:12,brute:21,boss:28,arrow:33,cannon:25,frost:34,storm:33,venom:27,ballista:25},h=heights[id];
       this.center=[0,bust?(id==="ranger"?25.0:h*.76):h*.49,0];this.viewHeight=bust?(id==="ranger"?12.0:h*.59):h*(id==="runner"?1.68:1.16);this.begin();
       this.drawData(this.character(id,pose,phase,skin),0,0,0,yaw);this.finish();
     }
     render(g,selected,choice,hover){
       this.begin();
       const effect=new Mesh();
+      if(this.buildPreview)effect.ring(this.buildPreview[0],this.buildPreview[1],9,1.3,"#ffe29b",1.8);
       g.supplies.forEach((c,j)=>{
         if(!g.supplyHealth[j])return;
         this.drawData(this.model("supply/"+j,m=>{
@@ -180,7 +187,7 @@
         if(e.hp<e.maxHp){const h=e.type==="boss"?30:e.type==="brute"?21:18,frac=Math.max(0,e.hp/e.maxHp),ang=-this.angle;
           effect.box(e.x,h,e.y,13,1.6,1.1,"#3b3236",ang);if(frac>0)effect.box(e.x+(frac-1)*6*this.ca,h+.15,e.y-(frac-1)*6*this.sa,12*frac,1.7,1.4,frozen?"#a9f8ff":"#e5cf82",ang)}
       }
-      for(const s of g.shots){const f=1-s.ttl/s.max,x=s.x+(s.tx-s.x)*f,z=s.y+(s.ty-s.y)*f,y=25+(6-25)*f+(s.type==="cannon"?13:2)*Math.sin(f*Math.PI);const arrow=s.type==="arrow"||s.type==="ranger";effect.box(x,y,z,arrow?.55:2,arrow?.55:2,arrow?7:3,s.type==="frost"?"#b8ffff":arrow?"#ffe4a3":"#352c29",Math.atan2(s.tx-s.x,s.ty-s.y))}
+      for(const s of g.shots){const f=1-s.ttl/s.max,x=s.x+(s.tx-s.x)*f,z=s.y+(s.ty-s.y)*f,y=25+(6-25)*f+(s.type==="cannon"?13:2)*Math.sin(f*Math.PI);const arrow=s.type==="arrow"||s.type==="ranger"||s.type==="ballista";if(s.type==="storm"){const dx=s.tx-s.x,dz=s.ty-s.y;for(let i=0;i<6;i++){const a=i/6,b=(i+1)/6,j=i%2?1.5:-1.5;effect.box(s.x+dx*(a+b)/2+j,(s.arc?8:23)+(8-(s.arc?8:23))*(a+b)/2,s.y+dz*(a+b)/2,1,1,Math.hypot(dx,dz)/6+1,"#d5bcff",Math.atan2(dx,dz))}continue}effect.box(x,y,z,arrow?.55:2,arrow?.55:2,arrow?7:3,s.type==="venom"?"#9ae453":s.type==="frost"?"#b8ffff":arrow?"#ffe4a3":"#352c29",Math.atan2(s.tx-s.x,s.ty-s.y))}
       const active=hover??selected;if(active!=null&&!g.ended){const t=g.towers[active]||{type:choice,level:1},[x,z]=g.pads[active];effect.ring(x,z,PineGame.levelStats(t.type,t.level).range,2.6,"#ffe39d",1.6)}
       if(effect.vertices.length){const data=this.data(effect,true);this.drawData(data);this.release(data)}
       this.finish();

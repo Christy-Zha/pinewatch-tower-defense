@@ -3,7 +3,10 @@
   const towers={
     arrow:{name:"游侠箭塔",brief:"单体 · 快速射击",cost:60,range:65,damage:13,delay:.66,description:"射速最快，优先攻击最接近城门的敌人。"},
     cannon:{name:"重装炮塔",brief:"范围 · 爆炸伤害",cost:90,range:59,damage:31,delay:1.95,description:"炮弹对命中点周围 22 格内的敌人造成范围伤害。"},
-    frost:{name:"寒霜法塔",brief:"控制 · 冻裂护甲",cost:75,range:57,damage:7,delay:.88,description:"命中后减速 45%，持续 2 秒。受寒或冻结时，重甲敌人的箭伤减免失效。"}
+    frost:{name:"寒霜法塔",brief:"控制 · 冻裂护甲",cost:75,range:57,damage:7,delay:.88,description:"命中后减速 45%，持续 2 秒。受寒或冻结时，重甲敌人的箭伤减免失效。"},
+    storm:{name:"引雷塔",brief:"闪电 · 连锁三敌",cost:105,range:56,damage:18,delay:1.55,description:"闪电会从命中目标向附近 29 格内的敌人再跳两次，每跳保留七成伤害。"},
+    venom:{name:"荆毒塔",brief:"毒刺 · 持续侵蚀",cost:85,range:61,damage:8,delay:1.12,description:"优先攻击未中毒的敌人。毒刺命中后持续 4 秒，每秒造成命中伤害一半的毒伤。"},
+    ballista:{name:"破甲重弩",brief:"远射 · 狙击重甲",cost:120,range:89,damage:40,delay:2.7,description:"优先瞄准重甲兵和领主，命中重甲时造成 1.5 倍伤害。"}
   };
   const units={
     scout:{name:"林地斥候",hint:"轻装步兵，成群沿山道前进。",hp:32,speed:26,bounty:3,leak:1},
@@ -31,15 +34,35 @@
       const post=this.point(Math.min(67,this.length*.12));
       this.post=stage?.post||[post.x+Math.cos(post.yaw)*13,post.y-Math.sin(post.yaw)*13];this.reset();
     }
-    reset(){this.supplyHealth=this.supplies.map(c=>c.hp);this.markedSupply=null;this.gold=this.stage?.gold??180;this.health=20;this.wave=0;this.kills=0;this.phase="ready";this.paused=false;this.speed=1;this.towers=this.pads.map(()=>null);this.enemies=[];this.shots=[];this.particles=[];this.queue=[];this.spawnIn=0;this.time=0;this.defeated=0;this.serial=0;this.waveSize=0;this.ranger={x:this.post[0],z:this.post[1],yaw:-.25,target:null,cycle:0,released:false}}
+    reset(){this.cleared=new Set();this.pads.length=this.fixedSites;this.supplyHealth=this.supplies.map(c=>c.hp);this.markedSupply=null;this.gold=this.stage?.gold??180;this.health=20;this.wave=0;this.kills=0;this.phase="ready";this.paused=false;this.speed=1;this.towers=this.pads.map(()=>null);this.enemies=[];this.shots=[];this.particles=[];this.queue=[];this.spawnIn=0;this.time=0;this.defeated=0;this.serial=0;this.waveSize=0;this.ranger={x:this.post[0],z:this.post[1],yaw:-.25,target:null,cycle:0,released:false}}
     get ended(){return this.phase==="won"||this.phase==="lost"}
+    get fixedSites(){return this.baseSites+this.supplies.length}
+    placementError(x,z){
+      if(!Number.isFinite(x)||!Number.isFinite(z)||!this.terrain)return "请选择战场空地";
+      const blocked=this.terrain.landError(x,z);
+      if(blocked)return blocked;
+      if(this.terrain.props.some(p=>!this.cleared.has(p.id)&&Math.hypot(x-p.x,z-p.z)<p.r+7))return "先清除这里的树木或石块";
+      if(this.pads.some(([px,pz],i)=>(this.towers[i]||this.supplyHealth[i-this.baseSites]>0)&&Math.hypot(x-px,z-pz)<17))return "与防御塔或物资箱太近";
+      return "";
+    }
+    buildAt(x,z,type){
+      if(this.ended||!towers[type]||this.gold<towers[type].cost||this.placementError(x,z))return false;
+      let i=this.towers.findIndex((t,n)=>n>=this.fixedSites&&!t);
+      if(i<0)i=this.pads.length;
+      this.pads[i]=[x,z];return this.build(i,type);
+    }
+    clearProp(id){
+      const p=this.terrain?.props.find(o=>o.id===id);
+      if(!p||this.ended||this.cleared.has(id)||this.gold<p.cost)return false;
+      this.gold-=p.cost;this.cleared.add(id);this.onEvent("landClear");return true;
+    }
     get clearedSupplies(){return this.supplyHealth.filter(hp=>hp===0).length}
     markSupply(j){
       if(this.ended||!this.supplyHealth[j])return false;
       this.markedSupply=this.markedSupply===j?null:j;return true;
     }
     point(d){const s=this.sections.find(v=>d<v.start+v.len)||this.sections[this.sections.length-1];const t=Math.max(0,Math.min(1,(d-s.start)/s.len));return {x:s.a[0]+(s.b[0]-s.a[0])*t,y:s.a[1]+(s.b[1]-s.a[1])*t,yaw:Math.atan2(s.b[0]-s.a[0],s.b[1]-s.a[1])}}
-    build(i,type){const t=towers[type];if(this.ended||!t||!this.pads[i]||this.supplyHealth[i-this.baseSites]>0||this.towers[i]||this.gold<t.cost)return false;this.gold-=t.cost;this.towers[i]={type,level:1,spent:t.cost,cd:0};this.onEvent("build");return true}
+    build(i,type){const t=towers[type];if(this.ended||!t||!this.pads[i]||this.supplyHealth[i-this.baseSites]>0||this.towers[i]||this.towers.some((other,n)=>other&&Math.hypot(this.pads[n][0]-this.pads[i][0],this.pads[n][1]-this.pads[i][1])<17)||this.gold<t.cost)return false;this.gold-=t.cost;this.towers[i]={type,level:1,spent:t.cost,cd:0};this.onEvent("build");return true}
     upgrade(i){const t=this.towers[i];if(this.ended||!t||t.level>=3||this.gold<upgradeCost(t))return false;const cost=upgradeCost(t);this.gold-=cost;t.spent+=cost;t.level++;this.onEvent("upgrade");return true}
     sell(i){const t=this.towers[i];if(this.ended||!t)return false;this.gold+=Math.floor(t.spent*.65);this.towers[i]=null;this.onEvent("sell");return true}
     start(){
@@ -63,7 +86,19 @@
     fire(i,t,target,stats){
       const [x,y]=this.pads[i],type=t.type;
       t.yaw=Math.atan2(target.x-x,target.y-y);this.shots.push({x,y,tx:target.x,ty:target.y,type,ttl:.29,max:.29});
-      if(type==="cannon"){for(const e of this.enemies){if(Math.hypot(e.x-target.x,e.y-target.y)<=22)e.hp-=stats.damage*(e.type==="runner"?.6:1)}this.burst(target.x,target.y-3,"#ffc272",9)}
+      if(type==="storm"){
+        let last=target,damage=stats.damage;const hit=new Set([target]);target.hp-=damage;
+        for(let jump=0;jump<2;jump++){
+          let next=null,reach=29;
+          for(const e of this.enemies){const d=Math.hypot(e.x-last.x,e.y-last.y);if(e.hp>0&&!hit.has(e)&&d<=reach){next=e;reach=d}}
+          if(!next)break;
+          damage=Math.round(damage*.7);next.hp-=damage;hit.add(next);
+          this.shots.push({x:last.x,y:last.y,tx:next.x,ty:next.y,type,arc:true,ttl:.24,max:.24});last=next;
+        }
+      }else if(type==="venom"){
+        target.hp-=stats.damage;target.poison=4;target.toxin=Math.max(target.toxin||0,stats.damage*.5);
+      }else if(type==="ballista")target.hp-=stats.damage*(["brute","boss"].includes(target.type)?1.5:1);
+      else if(type==="cannon"){for(const e of this.enemies){if(Math.hypot(e.x-target.x,e.y-target.y)<=22)e.hp-=stats.damage*(e.type==="runner"?.6:1)}this.burst(target.x,target.y-3,"#ffc272",9)}
       else{target.hp-=type==="arrow"?arrowDamage(target,stats.damage):stats.damage;if(type==="frost"){target.slow=2;this.burst(target.x,target.y-3,"#ade6f0",4)}}
       this.onEvent("shot",type);
     }
@@ -109,12 +144,17 @@
         const pack=this.stage?.formations?.[this.wave-1]==="pack"&&type==="runner"&&this.queue[0]==="runner";
         this.spawnIn+=Math.max(.54,1.05-this.wave*.041)*(this.stage?.rate||1)*(pack ? .5 : 1);
       }
-      for(const e of this.enemies){e.slow=Math.max(0,e.slow-dt);e.frozen=Math.max(0,(e.frozen||0)-dt);if(!e.frozen)e.d+=units[e.type].speed*(e.slow>0?.55:1)*dt;Object.assign(e,this.point(e.d))}
+      for(const e of this.enemies){if(e.poison>0){e.hp-=Math.min(dt,e.poison)*e.toxin;e.poison=Math.max(0,e.poison-dt);if(!e.poison)e.toxin=0}e.slow=Math.max(0,e.slow-dt);e.frozen=Math.max(0,(e.frozen||0)-dt);if(!e.frozen)e.d+=units[e.type].speed*(e.slow>0?.55:1)*dt;Object.assign(e,this.point(e.d))}
       this.aimRanger(dt);
       for(let i=0;i<this.towers.length;i++){const t=this.towers[i];if(!t)continue;t.cd=Math.max(0,t.cd-dt);if(t.cd>0)continue;
         const stats=levelStats(t.type,t.level),[x,y]=this.pads[i];let target=null;
         if(this.markedSupply!==null&&this.clearSupply(i,t,stats)){t.cd=stats.delay;continue}
-        for(const e of this.enemies)if(e.hp>0&&e.d<this.length&&(!target||e.d>target.d)&&Math.hypot(e.x-x,e.y-y)<=stats.range)target=e;
+        let priority=-Infinity;
+        for(const e of this.enemies){
+          if(e.hp<=0||e.d>=this.length||Math.hypot(e.x-x,e.y-y)>stats.range)continue;
+          const favored=(t.type==="venom"&&!e.poison)||(t.type==="ballista"&&(e.type==="brute"||e.type==="boss"));
+          const score=e.d+(favored?this.length:0);if(score>priority){target=e;priority=score}
+        }
         if(target){this.fire(i,t,target,stats);t.cd=stats.delay}
       }
       this.enemies=this.enemies.filter(e=>{

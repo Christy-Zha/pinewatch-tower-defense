@@ -64,12 +64,14 @@
         if(g.supplyHealth[j]){orderSupply(j);return}
         if(document.documentElement.classList.contains("battle-expanded")){siteOrders(i);return}
         if(g.towers[i]){selected=i;manageKey="";update();dirty=true;return}
-        if(!g.build(i,choice)){msg("军费不足，还需 "+(towers[choice].cost-g.gold)+" 金币");return}
+        if(!g.build(i,choice)){msg(g.gold<towers[choice].cost?"军费不足，还需 "+(towers[choice].cost-g.gold)+" 金币":"与已有防御塔太近");return}
         selected=null;update();dirty=true;msg(towers[choice].name+" 已部署")};$("pad-controls").append(b);return b});
   }
-  function siteOrders(i){
+  let pendingSite=null;
+  function siteOrders(i,point=null){
+    pendingSite=point;renderer.buildPreview=point;dirty=true;
     const tower=g.towers[i];
-    dialog("site","第 "+(i+1)+" 号塔位",tower?towers[tower.type].name+" · "+tower.level+" 级":"选择防御塔",'<div class="site-choices"></div>');
+    dialog("site",point?"自选塔位 · "+g.gold+" 军费":"第 "+(i+1)+" 号塔位",tower?towers[tower.type].name+" · "+tower.level+" 级":"选择防御塔",'<div class="site-choices"></div>');
     const list=$("dialog-body").firstElementChild;
     if(tower){
       const cost=upgradeCost(tower);
@@ -77,17 +79,26 @@
       improve.disabled=tower.level>=3||g.gold<cost;
       list.append(improve,btn("拆除 · 回收 "+Math.floor(tower.spent*.65)+" 军费","secondary",()=>{if(g.sell(i))closeDialog()}));
     }else for(const [type,t] of Object.entries(towers)){
-      const b=btn("","site-choice",()=>{if(g.build(i,type)){closeDialog();msg(t.name+" 已部署")}});
+      const b=btn("","site-choice",()=>{
+        const built=point?g.buildAt(...point,type):g.build(i,type);
+        if(built){if(point)installPads();closeDialog();draw();msg(t.name+" 已部署")}
+        else msg("这个位置已被占用，请另选空地");
+      });
       b.disabled=g.gold<t.cost;b.dataset.build=type;b.title=t.brief;
-      art(type,b);const label=make("strong"),price=make("span");label.textContent=t.name;price.textContent=t.cost+" 军费";b.append(label,price);list.append(b);
+      art(type,b);const label=make("strong"),detail=make("small"),price=make("span");label.textContent=t.name;detail.textContent=t.brief;price.textContent=t.cost+" 军费";b.append(label,detail,price);list.append(b);
     }
     positionSiteMenu(i);
     $("dialog").dataset.site=i;
   }
   function positionSiteMenu(i){
-    const d=$("dialog"),rect=pads[i].getBoundingClientRect(),gap=9;
+    const d=$("dialog"),gap=9;
     const sideways=document.documentElement.classList.contains("sideways-battle");
-    const p=sideways?{left:rect.top,width:rect.height,top:innerWidth-rect.right,bottom:innerWidth-rect.left}:rect;
+    const rect=(pendingSite?$("field"):pads[i]).getBoundingClientRect();
+    let p=sideways?{left:rect.top,width:rect.height,top:innerWidth-rect.right,bottom:innerWidth-rect.left}:rect;
+    if(pendingSite){
+      const [px,py]=renderer.project(pendingSite[0],1,pendingSite[1]),y=p.top+py/renderer.dpr;
+      p={left:p.left+px/renderer.dpr,width:0,top:y-8,bottom:y+8};
+    }
     const frameWidth=sideways?innerHeight:innerWidth,frameHeight=sideways?innerWidth:innerHeight;
     const w=d.offsetWidth,h=d.offsetHeight;
     const left=Math.min(Math.max(gap,p.left+p.width/2-w/2),frameWidth-w-gap);
@@ -119,18 +130,21 @@
   }
   function supplyOrders(){
     const actions=g.supplies.map((c,j)=>g.supplyHealth[j]>0&&!g.ended?[(g.markedSupply===j?"取消清障 · ":"标记 · ")+c.name,()=>{closeDialog();orderSupply(j)},"secondary"]:null).filter(Boolean);
-    dialog("supplies","FIELD SUPPLIES","战地物资",'<p>点箱子标记目标，射程内的塔会在战斗中优先清障。再点一次即可恢复守路。清掉箱子可获得军费，原地还能建塔。</p>'+g.supplies.map((c,j)=>'<p><b>'+c.name+'</b>　'+(g.supplyHealth[j]?'耐久 '+g.supplyHealth[j]+' / '+c.hp+'　奖励 '+c.gold+' 军费':'已清理 · 塔位已开放')+'</p>').join("")+'<p>清完两处物资并守住本章，可在战役纪事点亮全清勋章。</p>',[...actions,["返回战场",closeDialog]]);
+    dialog("supplies","FIELD SUPPLIES","战地物资",'<p>点路旁空地可建塔。点树木或石块可直接花军费清除。</p><p>点箱子标记目标，射程内的塔会在战斗中优先清障。再点一次即可恢复守路。清掉箱子可获得军费，原地还能建塔。</p>'+g.supplies.map((c,j)=>'<p><b>'+c.name+'</b>　'+(g.supplyHealth[j]?'耐久 '+g.supplyHealth[j]+' / '+c.hp+'　奖励 '+c.gold+' 军费':'已清理 · 塔位已开放')+'</p>').join("")+'<p>清完两处物资并守住本章，可在战役纪事点亮全清勋章。</p>',[...actions,["返回战场",closeDialog]]);
+  }
+  function refreshTerrain(){
+    renderer.set(stage,profile.chapter,profile.skin,g.cleared);g.terrain=renderer.terrain;
   }
   function setup(restore=false){
     stage=chapters[profile.chapter];g=new Battle(stage.path,stage.pads,onEvent,stage);
     if(!restore||!P.restore(profile,g)){g.towers[1]={type:"arrow",level:1,spent:0,cd:0};profile.run=null}
-    choice="arrow";selected=hover=null;clock=0;stamp=0;intelKey=manageKey="";renderer.set(stage,profile.chapter,profile.skin);renderer.resetCamera();$("frontline").setAttribute("aria-pressed","false");installPads();
+    choice="arrow";selected=hover=null;clock=0;stamp=0;intelKey=manageKey="";refreshTerrain();renderer.resetCamera();$("frontline").setAttribute("aria-pressed","false");installPads();
     $("chapter-title").textContent=stage.name;$("chapter-count").textContent="第 "+chapterNo()+" 章 / 共 "+chapters.length+" 章";$("mission").textContent=stage.mission;$("region").textContent=stage.region;
     $("story-label").textContent="第 "+chapterNo()+" 章 · 战地手记";$("story-title").textContent=stage.subtitle;$("story").textContent=stage.brief;$("wave-max").textContent=" / "+stage.waves;
     update();draw();save();if(restore&&g.ended)outcome();
   }
   function onEvent(e,type){
-    dirty=true;if(e==="shot"){sound.play(type);return}
+    dirty=true;if(e==="landClear"){refreshTerrain();sound.play("build")}if(e==="shot"){sound.play(type);return}
     if(["build","upgrade","start","cleared","leak","won","lost"].includes(e))sound.play(e);
     if(e==="won"){P.settle(profile,g);save();outcome();return}if(e==="lost"){save();outcome();return}
     if(e==="leak")msg("敌军突破城门");
@@ -163,7 +177,7 @@
     document.querySelector(".paused-overlay").hidden=!g.paused||!!modal;$("combat-progress").textContent=g.phase==="fight"?"本波敌军　"+g.defeated+" / "+g.waveSize:"";
     $("armory-content").hidden=selected!=null;$("manage").hidden=selected==null;if(selected!=null)manage();
     document.querySelectorAll(".tower-card").forEach(b=>{b.classList.toggle("chosen",b.dataset.type===choice);b.setAttribute("aria-pressed",b.dataset.type===choice);b.querySelector(".tower-cost").classList.toggle("price-low",g.gold<towers[b.dataset.type].cost)});
-    $("supply-orders").textContent="清障 "+g.clearedSupplies+" / "+g.supplies.length;
+    $("supply-orders").textContent="物资 "+g.clearedSupplies+" / "+g.supplies.length;
     pads.forEach((b,i)=>{
       const j=i-g.baseSites,c=g.supplies[j],hp=g.supplyHealth[j],t=g.towers[i];b.disabled=g.ended;
       const name=hp?c.name+" · 耐久 "+hp+" / "+c.hp+" · "+c.gold+" 军费":(i+1)+" 号基座 · "+(t?towers[t.type].name+" "+t.level+" 级":"建造"+towers[choice].name);
@@ -173,7 +187,7 @@
     handButtons.forEach((b,i)=>{const id=cardIds[i],n=profile.cards[id]||0;b.querySelector("small").textContent="×"+n;b.disabled=!n||!P.allowed(g,id);b.title=items[id].desc+(n?"":" 渡鸦商店可补给。")});intel();
   }
   let lastProjection="";
-  function draw(){renderer.render(g,selected,choice,hover);const key=[renderer.w,renderer.h,renderer.angle,renderer.pitch,renderer.zoom,renderer.viewHeight,profile.chapter,...g.towers.map(t=>!!t),...g.supplyHealth.map(Boolean)].join();if(key!==lastProjection){lastProjection=key;pads.forEach((b,i)=>{const [x,z]=g.pads[i],t=g.towers[i],[px,py,depth]=renderer.project(x,g.supplyHealth[i-g.baseSites]?7:t?12:3,z);b.hidden=px<0||px>renderer.w||py<0||py>renderer.h;b.style.left=px/renderer.w*100+"%";b.style.top=py/renderer.h*100+"%";b.style.zIndex=String(Math.round(300+depth));b.style.height=t?"9%":"6.3%"})}dirty=false}
+  function draw(){renderer.render(g,selected,choice,hover);const key=[renderer.w,renderer.h,renderer.angle,renderer.pitch,renderer.zoom,renderer.viewHeight,profile.chapter,...g.towers.map(t=>!!t),...g.supplyHealth.map(Boolean)].join();if(key!==lastProjection){lastProjection=key;pads.forEach((b,i)=>{const [x,z]=g.pads[i],t=g.towers[i],[px,py,depth]=renderer.project(x,g.supplyHealth[i-g.baseSites]?7:t?12:3,z);b.hidden=(i>=g.fixedSites&&!t)||px<0||px>renderer.w||py<0||py>renderer.h;b.style.left=px/renderer.w*100+"%";b.style.top=py/renderer.h*100+"%";b.style.zIndex=String(Math.round(300+depth));b.style.height=t?"9%":"6.3%"})}dirty=false}
   function animate(now){const dt=stamp?Math.min(.15,(now-stamp)/1000):0;stamp=now;const active=g.phase==="fight"&&!modal&&!g.paused&&!document.hidden;
     if(active){clock+=dt*g.speed;while(clock>=1/40){g.step(1/40);clock-=1/40}if(now-uiAt>180){update();uiAt=now}if(now-saveAt>1500){save();saveAt=now}}
     if((active||dirty||renderer.dirty)&&now-paintAt>(renderer.gl?25:65)){draw();paintAt=now}
@@ -182,6 +196,26 @@
     requestAnimationFrame(animate)}
   let drag=null,blockClick=0,pinchDistance=0;
   const touches=new Map(),area=$("map-area");
+  area.addEventListener("click",e=>{
+    if(g.ended||modal||performance.now()<blockClick||e.target.closest("button,.camera-bar,.scene-meta"))return;
+    const pos=PineRenderer.inputPoint(e),rect=$("field").getBoundingClientRect(),sideways=document.documentElement.classList.contains("sideways-battle");
+    const px=(pos.x-(sideways?rect.top:rect.left))*renderer.dpr,py=(pos.y-(sideways?innerWidth-rect.right:rect.top))*renderer.dpr;
+    let hit=null,best=Infinity;
+    for(const p of g.terrain.props){
+      const [x,y]=renderer.project(p.x,0,p.z),[,top]=renderer.project(p.x,p.h,p.z);
+      const radius=Math.max(5*renderer.dpr,p.r*renderer.scale);
+      const score=Math.hypot(px-x,py-Math.max(top,Math.min(y,py)))/radius;
+      if(score<=1&&score<best){hit=p;best=score}
+    }
+    if(hit){
+      const tree=hit.kind==="tree",name=tree?"树木":"石块";
+      dialog("terrain","清理场地",tree?"移除树木":"清除石块","<p>花费 "+hit.cost+" 军费清除这处"+name+"。当前有 "+g.gold+" 军费。</p>",[["取消",closeDialog,"secondary"],["清除 · "+hit.cost+" 军费",()=>{if(g.clearProp(hit.id)){closeDialog();draw();msg(name+"已清除")}}]]);
+      $("dialog-actions").lastElementChild.disabled=g.gold<hit.cost;return;
+    }
+    const point=renderer.ground(px,py),reason=g.placementError(...point);
+    if(reason){msg(reason);return}
+    siteOrders(-1,point);
+  });
   function fingerDistance(){const [a,b]=touches.values();return Math.hypot(a.x-b.x,a.y-b.y)}
   area.addEventListener("pointerdown",e=>{
     if(e.button!==0||e.target.closest(".camera-bar,.phone-tools"))return;
@@ -214,10 +248,10 @@
   }
   window.addEventListener("pine-camera-zoom",event=>zoomMap(Number(event.detail)));
   window.addEventListener("pine-field-layout",()=>{
-    renderer.set(stage,profile.chapter,profile.skin);renderer.resetCamera();frontline.setAttribute("aria-pressed","false");
+    refreshTerrain();renderer.resetCamera();frontline.setAttribute("aria-pressed","false");
     lastProjection="";dirty=true;draw();
   });
-  function closeDialog(){if($("dialog").open)$("dialog").close();modal="";stamp=0;dirty=true;update()}
+  function closeDialog(){if($("dialog").open)$("dialog").close();pendingSite=renderer.buildPreview=null;modal="";stamp=0;dirty=true;update()}
   function dialog(kind,label,title,html="",actions=[]){
     modal=kind;const d=$("dialog");d.dataset.kind=kind;$("dialog-label").textContent=label;$("dialog-title").textContent=title;$("dialog-body").innerHTML=html;$("dialog-actions").replaceChildren();
     for(const [name,fn,cls] of actions)$("dialog-actions").append(btn(name,cls||"primary",fn));if(!d.open)d.showModal();update()}
@@ -257,14 +291,14 @@
     $("bank").textContent=profile.bank+" 金币";document.querySelectorAll("[data-tab]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===shopTab));const list=$("wares");list.replaceChildren();$("shop-feedback").textContent="";
     for(const [id,item] of Object.entries(items)){if(shopTab!==item.kind)continue;const row=make("div","ware "+id);row.style.setProperty("--item-color",item.color||({hail:"#91d5df",blaze:"#edaa7c",mend:"#b1c994"})[id]);
       const owned=profile.skins.includes(id),equipped=profile.skin===id;row.innerHTML='<div class="item-sigil">'+svg(item.sigil)+'</div><div class="item-copy"><strong>'+item.name+'</strong><p>'+item.desc+'</p><small>'+(item.kind==="card"?"背包 ×"+(profile.cards[id]||0):owned?"永久拥有":"永久装扮")+'</small></div>';
-      const b=btn(equipped?"已装备":owned?"装备":item.price+" 金币","secondary",()=>{if(!P.purchase(profile,id))return;save();if(item.kind==="skin"){renderer.set(stage,profile.chapter,profile.skin);document.querySelectorAll(".tower-image").forEach(box=>{const type=box.querySelector("canvas").dataset.model;box.replaceChildren();art(type,box)});manageKey=intelKey="";dirty=true;draw()}update();shopItems();$("shop-feedback").textContent=item.name+(item.kind==="skin"?" 已装备":" 已放入手牌");sound.play("purchase")});
+      const b=btn(equipped?"已装备":owned?"装备":item.price+" 金币","secondary",()=>{if(!P.purchase(profile,id))return;save();if(item.kind==="skin"){refreshTerrain();document.querySelectorAll(".tower-image").forEach(box=>{const type=box.querySelector("canvas").dataset.model;box.replaceChildren();art(type,box)});manageKey=intelKey="";dirty=true;draw()}update();shopItems();$("shop-feedback").textContent=item.name+(item.kind==="skin"?" 已装备":" 已放入手牌");sound.play("purchase")});
       b.dataset.buy=id;b.disabled=equipped||(!owned&&profile.bank<item.price);row.append(b);list.append(row)}
   }
   $("start").onclick=()=>g.ended?outcome():g.start();$("speed").onclick=()=>{g.speed=g.speed===1?2:g.speed===2?3:1;save();update()};
   function pause(){if(modal||g.ended)return;g.paused=!g.paused;save();dirty=true;update()}
   $("pause").onclick=pause;$("battle-nav").onclick=()=>{if(modal)closeDialog();$("map-area").scrollIntoView({block:"nearest"})};
   $("shop-btn").onclick=$("cards-store").onclick=shop;$("chapters-btn").onclick=$("read-journal").onclick=journal;
-  $("help").onclick=()=>dialog("help","FIELD MANUAL","守城指南","<p><b>建造与战斗</b>　全屏时先点沙盘里的 ＋，再选塔型。普通视图也可以先在工坊选塔。点击已有防御塔可升级或拆除。每波手动开始。</p><p><b>观察战场</b>　点击「前线近景」可到阿遥身边观看交战，再点一次返回全图。拖动调整视角。「角色图鉴」可旋转、放大五名角色与三类防御塔，观看角色动作。</p><p><b>商店与手牌</b>　旅行钱包初始有 80 金币，另赠一张寒潮敕令。守住一章后，剩余军费存入钱包，可跨关购买卡牌和永久装扮。战术手牌点击即用。</p><p><b>战役存档</b>　每一章都有独立军费和防线。在同一浏览器打开同一文件，可接续上次战役；恢复战斗时点「继续」。战役纪事可回看剧情和重玩已解锁章节。</p>",[["返回战场",closeDialog]]);
+  $("help").onclick=()=>dialog("help","FIELD MANUAL","守城指南","<p><b>建造与战斗</b>　点路旁空地自由建塔，或使用 ＋ 基座。点树木或石块可花军费清除。普通视图也可以先在工坊选塔。点击已有防御塔可升级或拆除。每波手动开始。</p><p><b>观察战场</b>　点击「前线近景」可到阿遥身边观看交战，再点一次返回全图。拖动调整视角。「角色图鉴」可旋转、放大五名角色与六类防御塔，观看角色动作。</p><p><b>商店与手牌</b>　旅行钱包初始有 80 金币，另赠一张寒潮敕令。守住一章后，剩余军费存入钱包，可跨关购买卡牌和永久装扮。战术手牌点击即用。</p><p><b>战役存档</b>　每一章都有独立军费和防线。在同一浏览器打开同一文件，可接续上次战役；恢复战斗时点「继续」。战役纪事可回看剧情和重玩已解锁章节。</p>",[["返回战场",closeDialog]]);
   $("supply-orders").onclick=supplyOrders;
   $("battle-menu").onclick=battleMenu;
   $("restart").onclick=()=>dialog("restart","RETRY CHAPTER","重新开始「"+stage.name+"」？","<p>回到第一波前重新布防，城门生命和本关军费恢复初始值。旅行钱包、剩余手牌、装扮和已解锁章节会保留。</p>",[["本局重来",restartChapter],["取消",closeDialog,"secondary"],["全部重来",confirmReset,"secondary"]]);
@@ -272,5 +306,5 @@
   document.addEventListener("keydown",e=>{if(modal||e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;if(["1","2","3"].includes(e.key))choose(Object.keys(towers)[+e.key-1]);if(e.key.toLowerCase()==="x")$("speed").click();if(e.code==="Space"&&!e.target.closest?.("#restart,#sound")){e.preventDefault();pause()}if(e.key==="Escape")choose(choice)});
   document.addEventListener("visibilitychange",()=>{stamp=0;if(document.hidden&&g.phase==="fight"){g.paused=true;update();save()}});window.addEventListener("pagehide",save);
   new ResizeObserver(()=>{dirty=true;lastProjection="";if(modal==="site"){draw();positionSiteMenu(Number($("dialog").dataset.site))}}).observe(area);
-  icons();PineSprites.emblem($("emblem").getContext("2d"));setup(true);requestAnimationFrame(animate);
+  icons();PineSprites.emblem($("emblem").getContext("2d"));setup(true);if(!modal&&!g.wave)msg("点路旁空地建塔，点树石清障");requestAnimationFrame(animate);
 })();

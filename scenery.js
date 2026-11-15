@@ -12,8 +12,14 @@
     for(const off of [16,8,0])n|=Math.round(((aa>>off)&255)*(1-k)+((bb>>off)&255)*k)<<off;
     return '#'+(n>>>0).toString(16).padStart(6,'0');
   }
-  function build(m,stage,index=0,skin='pine',continuous=false) {
+  function build(m,stage,index=0,skin='pine',continuous=false,cleared=new Set()) {
     let seed=(4723921+index*84387)>>>0;
+    const layoutSeed=seed,props=[],structures=[];
+    function recordProp(kind,x,z,r,h,start){
+      const id=kind+":"+Math.round(x*10)+":"+Math.round(z*10);
+      if(cleared.has(id))m.vertices.length=start;
+      else props.push({id,kind,x,z,r,h,cost:kind==="tree"?4:6});
+    }
     index=stage.province?.scenery??index;
     const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
     const between=(a,b)=>a+(b-a)*rnd(),choose=arr=>arr[Math.floor(rnd()*arr.length)];
@@ -112,14 +118,14 @@
       }
     }
     if(streamClear){
+      let water=brook;
       if(continuous){
         const [sx,sz]=brook[0],[ex,ez]=brook.at(-1);
-        brook.unshift([sx-21,sz-margin],[sx+9,sz-70]);
-        brook.push([ex-12,ez+70],[ex+28,ez+margin]);
+        water=[[sx-21,sz-margin],[sx+9,sz-70],...brook,[ex-12,ez+70],[ex+28,ez+margin]];
       }
-      ribbon(brook,6.1,.20,blend(P.soil,rock,.60));
-      ribbon(brook,5.35,.32,blend(P.water,rock,.38));
-      ribbon(brook,4.8,.41,i=>blend(P.water,'#9edcbb',.07+(i%4)*.045));
+      ribbon(water,6.1,.20,blend(P.soil,rock,.60));
+      ribbon(water,5.35,.32,blend(P.water,rock,.38));
+      ribbon(water,4.8,.41,i=>blend(P.water,'#9edcbb',.07+(i%4)*.045));
       for(let i=0;i<20;i++){
         const j=Math.floor(between(1,brook.length-1)),[x,z]=brook[j];
         const rx=x+between(-2.6,2.6),rz=z+between(-3,3);
@@ -392,11 +398,12 @@
         solid(x,8.8,z,.38,.37,1.0,6,bark);solid(x,10.3,z,6.3,.38,4.8,4,roof,Math.PI/4);
       }
     }
+    seed=layoutSeed;
     let landmarkCount=0;
     for(const [fx,fz] of [[.77,.13],[.26,.81],[.48,.17],[.18,.21],[.84,.80],[.47,.78]]){
       const x=x0+fx*(x1-x0),z=z0+fz*(z1-z0);
       if(safe(x,z,7.3,14)){
-        landmark(x,z);occupied.push([x,z,8.4]);landmarkCount++;
+        landmark(x,z);occupied.push([x,z,8.4]);structures.push([x,z]);landmarkCount++;
         if(landmarkCount>=2)break;
       }
     }
@@ -404,8 +411,10 @@
       for(const fx of [.18,.32,.62,.87]){
         const x=x0+(x1-x0)*fx+between(-9,9),z=z0+between(14,24),r=between(12,18),h=between(16,31);
         if(safe(x,z,r,h)&&occupied.every(o=>dist2(x,z,o)>(o[2]+r*.67)**2)){
+          const start=m.vertices.length;
           mountain(x,z,r,r*.65,h);occupied.push([x,z,r*.88]);
           if(safe(x+r*.71,z+3,r*.57,h*.52))mountain(x+r*.71,z+3,r*.57,r*.41,h*.52);
+          recordProp("rock",x,z,r*1.2,h,start);
         }
       }
     }
@@ -421,23 +430,28 @@
         const x=ax+between(-14,14),z=az+between(-9,9);
         const h=z>z1-36?between(8.5,16.2):between(12,26), r=h*between(.18,.25);
         if(!safe(x,z,r,h)||occupied.some(o=>dist2(x,z,o)<(o[2]+r*.65)**2))continue;
+        const start=m.vertices.length;let kind="tree",height=h;
         shadow(x+.8,z+1,r*.97,r*.76);
         if(index===2&&rnd()<.57){
           solid(x,.14,z,r*.14,r*.1,h*.58,5,bark);
           stoneBlock(x,h*.40,z,r,r*.91,h*.46,rnd(),choose(['#c49148','#bc753e','#d8ab5c']));
           stoneBlock(x-r*.38,h*.60,z+r*.23,r*.64,r*.60,h*.31,rnd(),choose(['#dfad5e','#d89d53']));
         }else if(index===6&&rnd()<.56){
+          kind="rock";height=h*.5;
           solid(x,.1,z,r*.72,r*.57,h*.49,5,B(rock,.18),.38);
           solid(x+.74*r,.14,z+.41*r,r*.51,r*.45,h*.31,5,rock,.31);
         }else pine(x,z,h,r);
+        recordProp(kind,x,z,r,height,start);
         occupied.push([x,z,r*.7]);
       }
     }
     for(let i=0;i<66;i++){
       const x=between(x0+8,x1-7),z=between(z0+9,z1-8),r=between(1.8,4.9);
       if(!safe(x,z,r,r*1.3)||occupied.some(o=>dist2(x,z,o)<(o[2]+r*.68)**2))continue;
+      const start=m.vertices.length;
       stoneBlock(x,.18,z,r,r*between(.57,.86),r*between(.52,1.13),between(0,2),blend(rock,P.soil,between(0,.25)));
       if(r>3.6&&safe(x+r,z+r*.62,r*.38))stoneBlock(x+r,.14,z+r*.62,r*.42,r*.36,r*.32,r,rock);
+      recordProp("rock",x,z,r,r,start);
     }
     // Waystones and small flower clusters lend the broad terrain a readable sense of scale.
     for(let i=0;i<125;i++){
@@ -462,6 +476,13 @@
       solid(x,2.53,z,6.87,6.80,.16,8,blend(stone,P.grass,.16),Math.PI/8);
       for(const [w,d] of [[7.3,1.67],[1.67,7.3]])box(x,2.83,z,w,.36,d,'#eddeb5');
     }
+    return {props,landError(x,z){
+      if(x<x0+10||x>x1-10||z<z0+10||z>z1-10)return "请在战场边界内选址";
+      if(distance(x,z,trail)<trailW+8)return "这里是行军道路，请点路旁的空地";
+      if(isWet(x,z,7))return "河道上无法建塔";
+      if(dist2(x,z,end)<30**2||dist2(x,z,entry)<19**2||dist2(x,z,stage.post)<15**2||structures.some(p=>dist2(x,z,p)<16**2))return "请给城防和建筑留出空间";
+      return "";
+    }};
   }
   window.PineScenery={build};
 })();
