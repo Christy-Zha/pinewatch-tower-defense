@@ -219,6 +219,30 @@ html.sideways-battle .map-area.show-tools .camera-bar {bottom:55px;right:max(8px
 #camp-shifts {display:flex;gap:5px}#camp-shifts button,#camp-forge button {min-height:40px}
 #build-grid {position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
 #build-grid[hidden] {display:none}
+#combat-fx {position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4}
+#battle-brief,#boss-meter,#kill-combo,#wave-cue {position:absolute;pointer-events:none;z-index:590}
+#battle-brief {top:55px;left:12px;max-width:min(460px,65%);white-space:pre-line;padding:8px 12px;border-left:3px solid #e7c575;background:#192d24e8;color:#eee5c7;font:12px/1.6 system-ui;border-radius:4px}
+#boss-meter {top:55px;left:50%;transform:translateX(-50%);width:min(280px,44%);padding:7px 12px;background:#321e22ed;border:1px solid #c57f5c;border-radius:8px;color:#ffe1c5;font:12px system-ui;text-align:center}
+#boss-meter progress {display:block;width:100%;height:10px;margin-top:5px;accent-color:#f09057}
+#kill-combo {top:135px;left:18px;color:#ffe1a1;text-shadow:0 2px 5px #17261d;font:bold 22px system-ui}
+#wave-cue {top:34%;left:50%;transform:translate(-50%,-50%);max-width:82%;width:max-content;padding:12px 24px;text-align:center;background:#172a24ed;border-block:1px solid #e9c67c;border-radius:6px;color:#ffe2a7;box-shadow:0 8px 30px #101d2355}
+#wave-cue strong {display:block;font:700 23px system-ui}#wave-cue span {display:block;font:12px system-ui;color:#d8e2d0;margin-top:5px}
+#hero-skill {position:absolute;right:12px;bottom:65px;z-index:600;min-height:46px;min-width:142px;border:1px solid #e4bc68;border-radius:8px;padding:8px 12px;color:#ffe2a2;background:linear-gradient(to right,#77602e var(--charge),#24372f var(--charge));font:bold 13px system-ui;cursor:pointer;touch-action:manipulation}
+#hero-skill:disabled {color:#cad0b8;border-color:#87916f;cursor:default}#hero-skill.charged {box-shadow:0 0 18px #e6b34b66}
+.show-tools #hero-skill {display:none}
+html.battle-expanded #hero-skill {right:max(12px,var(--battle-r,env(safe-area-inset-right)));bottom:calc(65px + var(--battle-b,env(safe-area-inset-bottom)))}
+#battle-brief[hidden],#boss-meter[hidden],#kill-combo[hidden],#wave-cue[hidden],#hero-skill[hidden] {display:none}
+#dialog[data-kind=doctrine] #dialog-actions {flex-direction:column}
+.unlock-reward {border:1px solid #bb9f62;border-radius:8px;padding:14px;background:linear-gradient(135deg,#47553b,#29372b);margin-bottom:12px}
+.unlock-reward small {color:#dfc483}.unlock-reward h3 {font-size:24px;color:#ffe0a1;margin:4px 0}.next-hook {color:#f2ce88}
+#dialog[open][data-kind=result] {display:flex;flex-direction:column;overflow:hidden;max-height:calc(100dvh - 22px)}
+#dialog[data-kind=result] #dialog-body {overflow:auto;min-height:0;overscroll-behavior:contain}
+#dialog[data-kind=result] .dialog-head,#dialog[data-kind=result] h2,#dialog[data-kind=result] #dialog-actions {flex-shrink:0}
+#dialog[data-kind=result] #dialog-actions {flex-wrap:wrap;margin-top:10px;padding-top:9px;border-top:1px solid #647354}
+html.sideways-battle #dialog[data-kind=result] {max-height:calc(100dvw - var(--battle-t) - var(--battle-b) - 18px);padding:14px}
+html.sideways-battle #dialog[data-kind=result] h2 {font-size:21px;margin:5px 0}
+html.sideways-battle #dialog[data-kind=result] .unlock-reward {padding:8px 11px}
+@media(prefers-reduced-motion:reduce){#hero-skill.charged{box-shadow:none}}
 #grid-toggle {pointer-events:auto;touch-action:manipulation;min-height:32px;padding:4px 9px;border:1px solid #95a078;border-radius:6px;background:#20382bef;color:#efdfae;font:600 12px system-ui;cursor:pointer}
 #grid-toggle[aria-pressed=true] {background:#e0c27d;color:#243025;border-color:#ffe3a2}
 html.battle-expanded #grid-toggle {height:44px}

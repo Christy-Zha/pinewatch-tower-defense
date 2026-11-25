@@ -1,13 +1,16 @@
 (() => {
   "use strict";
   const {chapters,items}=PineCampaign;
-  const key="pinewatch.chronicle.v1",fields=["gold","health","wave","kills","phase","towers","enemies","queue","time","spawnIn","defeated","serial","waveSize","speed","ranger"];
+  const key="pinewatch.chronicle.v1",fields=["gold","health","wave","kills","phase","towers","enemies","queue","time","spawnIn","defeated","serial","waveSize","speed","ranger","encounterVersion","doctrine","volleyCharge","bannerTime","bestCombo"];
+  function applyMastery(p,g){g.mastery={volley:!!p.records[0],shatter:!!p.records[1],banner:!!p.records[2]}}
   const fresh=()=>({version:1,chapter:0,unlocked:0,bank:80,cards:{hail:1,blaze:0,mend:0},skins:["pine"],skin:"pine",records:{},run:null});
   function load(){
     try{const p=JSON.parse(localStorage.getItem(key));if(p?.version===1&&Number.isInteger(p.chapter)&&chapters[p.chapter]&&Number.isInteger(p.unlocked)&&p.unlocked>=p.chapter&&p.unlocked<chapters.length&&p.cards&&Array.isArray(p.skins)&&p.skins.includes(p.skin)&&Number.isSafeInteger(p.bank)&&p.bank>=0&&p.records){if(p.records[7]&&p.unlocked===7)p.unlocked=8;return p}}catch{}return fresh()
   }
   function restore(p,g){
     const r=p.run;if(!r||r.chapter!==p.chapter||!r.state)return false;const s=r.state;
+    // Keep an in-progress original campaign on its original wave script until restarted.
+    if(s.encounterVersion!==2&&g.stage?.legacy){g.stage={...g.stage,...g.stage.legacy,opening:null};g.waves=g.stage.lineup;g.encounterVersion=1}
     const extra=s.customSites??[];
     if(!Array.isArray(extra)||extra.some(p=>!Array.isArray(p)||p.length!==2||!p.every(Number.isFinite)))return false;
     if(!Number.isInteger(s.wave)||s.wave<0||s.wave>g.waves.length||!Array.isArray(s.towers)||!(s.towers.length===g.fixedSites+extra.length||(!extra.length&&s.towers.length===g.baseSites))||!["fight","ready","lost","won"].includes(s.phase))return false;
@@ -20,7 +23,7 @@
     g.towers=Array.from({length:g.pads.length},(_,i)=>s.towers[i]||null);
     g.supplyHealth=g.supplies.map((c,i)=>Number.isFinite(s.supplyHealth?.[i])?Math.max(0,Math.min(c.hp,s.supplyHealth[i])):c.hp);
     g.markedSupply=g.supplyHealth[s.markedSupply]>0?s.markedSupply:null;
-    g.paused=s.phase==="fight";return true;
+    g.paused=s.phase==="fight";applyMastery(p,g);return true;
   }
   function save(p,g){
     const state={camp:g.camp,supplyHealth:g.supplyHealth,markedSupply:g.markedSupply,customSites:g.pads.slice(g.fixedSites),cleared:[...g.cleared]};for(const f of fields)state[f]=g[f];
@@ -52,8 +55,11 @@
   function settle(p,g){
     if(g.phase!=="won"||p.run?.payout)return null;
     const first=!p.records[p.chapter],bonus=first?45+p.chapter*10:0,earned=g.gold+bonus;
-    p.bank+=earned;const previous=p.records[p.chapter];p.records[p.chapter]={health:Math.max(previous?.health||0,g.health),wins:(previous?.wins||0)+1,salvaged:!!previous?.salvaged||(g.supplies.length>0&&g.clearedSupplies===g.supplies.length)};
-    p.unlocked=Math.min(chapters.length-1,Math.max(p.unlocked,p.chapter+1));p.run=p.run||{};p.run.payout={earned,bonus};return p.run.payout;
+    p.bank+=earned;const previous=p.records[p.chapter];
+    const challenge=!!g.stage?.opening&&(p.chapter===1?g.clearedSupplies===g.supplies.length:g.health>=(p.chapter===0?16:12)),cardBonus=challenge&&!previous?.challenge;
+    if(cardBonus)p.cards.hail=(p.cards.hail||0)+1;
+    p.records[p.chapter]={health:Math.max(previous?.health||0,g.health),wins:(previous?.wins||0)+1,salvaged:!!previous?.salvaged||(g.supplies.length>0&&g.clearedSupplies===g.supplies.length),challenge:!!previous?.challenge||challenge};
+    p.unlocked=Math.min(chapters.length-1,Math.max(p.unlocked,p.chapter+1));p.run=p.run||{};p.run.payout={earned,bonus,cardBonus};return p.run.payout;
   }
-  window.PineProgress={key,load,save,restore,resetCampaign,purchase,allowed,use,settle};
+  window.PineProgress={key,load,save,restore,resetCampaign,purchase,allowed,use,settle,applyMastery};
 })();

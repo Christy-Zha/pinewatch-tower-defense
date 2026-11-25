@@ -72,6 +72,14 @@
         const t=this.context.currentTime;if(t-this.lastShot<.085)return;this.lastShot=t;
       }
       switch(cue){
+        case "kill":{
+          const now=this.context.currentTime;if(now-(this.lastKill||0)<.12)return;this.lastKill=now;
+          n("sine",880,1320,.09,.12);break;
+        }
+        case "volley":
+          [0,.06,.12].forEach(d=>n("sawtooth",600,85,.25,.10,d));n("sine",160,40,.45,.35,.15);break;
+        case "boss":
+          n("sawtooth",110,70,.6,.17);n("triangle",165,82,.5,.24,.22);break;
         case "ranger":case "arrow":
           n("triangle",840,165,.16,.30);n("sine",310,100,.11,.16,.012);break;
         case "ballista": n("triangle",350,90,.21,.32);break;

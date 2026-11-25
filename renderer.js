@@ -55,7 +55,8 @@
     }
     constructor(canvas){
       this.canvas=canvas;this.stage=null;this.staticData=null;this.models=new Map();this.dirty=true;this.resetCamera();
-      const gl=canvas.getContext("webgl",{alpha:true,antialias:true,premultipliedAlpha:true,preserveDrawingBuffer:false});
+      // The battlefield renders on demand while paused or in menus; keep that frame on WebKit.
+      const gl=canvas.getContext("webgl",{alpha:true,antialias:true,premultipliedAlpha:true,preserveDrawingBuffer:canvas.id==="field"});
       this.gl=gl;if(gl)this.initGL();else{this.ctx=canvas.getContext("2d");this.softwareCache=null}
     }
     initGL(){
@@ -195,16 +196,20 @@
         if(g.markedSupply===j)effect.ring(c.x,c.z,12,3,"#ffda75",2);
       });
       g.towers.forEach((t,i)=>{if(!t)return;const [x,z]=g.pads[i],key=[t.type,t.level,this.skin].join("/");
-        this.drawData(this.model(key,m=>PineFigures.tower(m,t.type,0,0,t.level,this.skin)),x,1.4,z,t.yaw||0)});
+        this.drawData(this.model(key,m=>PineFigures.tower(m,t.type,0,0,t.level,this.skin)),x,1.4+(t.kick||0)*5,z,t.yaw||0)});
       const r=g.ranger,aiming=g.phase==="fight"&&(r.target!==null||r.released);
       this.drawData(this.character("ranger",aiming?"shoot":"idle",aiming?r.cycle:g.time*.33,this.skin,false,aiming),r.x,1,r.z,r.yaw);
       for(const e of g.enemies){
         const frozen=e.frozen>0||e.slow>0,phase=e.frozen>0?0:e.d/(e.type==="runner"?16:12)+e.id*.13;
         this.drawData(this.character(e.type,"walk",phase,this.skin,frozen),e.x,1,e.y,e.yaw);
+        if(e.flash>0)effect.ring(e.x,e.y,7,2,"#fff3cd",2);
+        if(e.enraged)effect.ring(e.x,e.y,14,2,"#ff8150",2.2);
         if(e.hp<e.maxHp){const h=e.type==="boss"?30:e.type==="brute"?21:18,frac=Math.max(0,e.hp/e.maxHp),ang=-this.angle;
           effect.box(e.x,h,e.y,13,1.6,1.1,"#3b3236",ang);if(frac>0)effect.box(e.x+(frac-1)*6*this.ca,h+.15,e.y-(frac-1)*6*this.sa,12*frac,1.7,1.4,frozen?"#a9f8ff":"#e5cf82",ang)}
       }
-      for(const s of g.shots){const f=1-s.ttl/s.max,x=s.x+(s.tx-s.x)*f,z=s.y+(s.ty-s.y)*f,y=25+(6-25)*f+(s.type==="cannon"?13:2)*Math.sin(f*Math.PI);const arrow=s.type==="arrow"||s.type==="ranger"||s.type==="ballista";if(s.type==="storm"){const dx=s.tx-s.x,dz=s.ty-s.y;for(let i=0;i<6;i++){const a=i/6,b=(i+1)/6,j=i%2?1.5:-1.5;effect.box(s.x+dx*(a+b)/2+j,(s.arc?8:23)+(8-(s.arc?8:23))*(a+b)/2,s.y+dz*(a+b)/2,1,1,Math.hypot(dx,dz)/6+1,"#d5bcff",Math.atan2(dx,dz))}continue}effect.box(x,y,z,arrow?.55:2,arrow?.55:2,arrow?7:3,s.type==="venom"?"#9ae453":s.type==="frost"?"#b8ffff":arrow?"#ffe4a3":"#352c29",Math.atan2(s.tx-s.x,s.ty-s.y))}
+      for(const s of g.shots){const f=1-s.ttl/s.max,x=s.x+(s.tx-s.x)*f,z=s.y+(s.ty-s.y)*f,y=s.type==="volley"?55*(1-f)+3:25+(6-25)*f+(s.type==="cannon"?13:2)*Math.sin(f*Math.PI);const arrow=s.type==="arrow"||s.type==="ranger"||s.type==="ballista"||s.type==="volley";if(s.type==="storm"){const dx=s.tx-s.x,dz=s.ty-s.y;for(let i=0;i<6;i++){const a=i/6,b=(i+1)/6,j=i%2?1.5:-1.5;effect.box(s.x+dx*(a+b)/2+j,(s.arc?8:23)+(8-(s.arc?8:23))*(a+b)/2,s.y+dz*(a+b)/2,1,1,Math.hypot(dx,dz)/6+1,"#d5bcff",Math.atan2(dx,dz))}continue}effect.box(x,y,z,arrow?.8:2,arrow?.8:2,arrow?9:3,s.type==="venom"?"#9ae453":s.type==="frost"?"#b8ffff":arrow?"#ffe4a3":"#352c29",Math.atan2(s.tx-s.x,s.ty-s.y))}
+      for(const p of g.impacts||[]){const f=1-p.ttl/p.max;effect.ring(p.x,p.z,Math.max(1,p.size*f),2.8,p.color,Math.max(.4,2*(1-f)))}
+      for(const p of g.particles){const size=Math.max(.3,p.ttl*4);effect.box(p.x,3+p.ttl*12,p.y,size,size,size,p.color)}
       const active=selected??hover;if(active!=null&&g.towers[active]&&!g.ended){const t=g.towers[active],[x,z]=g.pads[active];effect.ring(x,z,PineGame.levelStats(t.type,t.level).range,2.6,"#ffe39d",2)}
       if(effect.vertices.length){const data=this.data(effect,true);this.drawData(data);this.release(data)}
       this.finish();

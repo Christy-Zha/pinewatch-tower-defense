@@ -32,6 +32,13 @@
   });
   const {Battle,towers,units,upgradeCost,levelStats}=PineGame,{chapters,items}=PineCampaign,P=PineProgress,profile=P.load(),renderer=new PineRenderer($("field"));
   let g,stage,selected=null,hover=null,choice="arrow",modal="",timer,stamp=0,clock=0,saveAt=0,paintAt=0,uiAt=0,dirty=true,manageKey="",intelKey="",saveError=false,pads=[],shopTab="card";
+  const feedback=new PineBattleFeedback($("map-area"),()=>{if(!modal)g.volley()});
+  function chooseBattleDoctrine(){
+    dialog("doctrine","战地援助 · 本局二选一","选一种打法，守住接下来的进攻",'<p>阿遥找到了前哨的军械图。这次选择持续到本局结束，重玩时可以换一条路线。</p>',[
+      ["疾风箭阵 · 箭塔攻速 +30%",()=>pick("rapid")],
+      ["碎甲炮火 · 炮塔伤害 +30%",()=>pick("siege"),"secondary"]]);
+    function pick(id){if(g.chooseDoctrine(id)){closeDialog();feedback.cue(id==="rapid"?"疾风箭阵":"碎甲炮火","本局强化已生效 · 升级后的防御塔同样受益")}}
+  }
   const fmt=n=>String(n).padStart(2,"0"),btn=(text,cls,fn)=>{const b=make("button",cls);b.textContent=text;b.onclick=fn;return b};
   const cardIds=["hail","blaze","mend"];const chapterNo=()=>fmt(profile.chapter+1);
   const rangerView=new PineRenderer($("ranger-preview"));rangerView.angle=.38;rangerView.pitch=.045;
@@ -202,7 +209,8 @@
   }
   function setup(restore=false){
     stage=chapters[profile.chapter];g=new Battle(stage.path,stage.pads,onEvent,stage);
-    if(!restore||!P.restore(profile,g)){profile.run=null}
+    if(!restore||!P.restore(profile,g)){profile.run=null;stage=chapters[profile.chapter];g=new Battle(stage.path,stage.pads,onEvent,stage)}else stage=g.stage;
+    P.applyMastery(profile,g);feedback.reset();
     choice="arrow";selected=hover=null;pendingSite=null;setBuildGrid(false);gridValidity="";clock=0;stamp=0;intelKey=manageKey="";refreshTerrain();renderer.resetCamera();$("frontline").setAttribute("aria-pressed","false");installPads();
     $("chapter-title").textContent=stage.name;$("chapter-count").textContent="第 "+chapterNo()+" 章 / 共 "+chapters.length+" 章";$("mission").textContent=stage.mission;$("region").textContent=stage.region;
     $("story-label").textContent="第 "+chapterNo()+" 章 · 战地手记";$("story-title").textContent=stage.subtitle;$("story").textContent=stage.brief;$("wave-max").textContent=" / "+stage.waves;
@@ -210,6 +218,10 @@
   }
   function onEvent(e,type){
     dirty=true;if(e==="landClear"){refreshTerrain();sound.play("build")}if(e==="shot"){sound.play(type);return}
+    if(e==="volley"){feedback.flashUntil=performance.now()+180;feedback.cue("流星箭雨",g.mastery.banner?"全场压制 · 破阵战旗已展开":"全场压制 · 击杀敌人可再次充能");sound.play("volley")}
+    if(e==="boss"||e==="rage"){feedback.cue(e==="rage"?"督军狂暴！":"碎岩督军登场",e==="rage"?"移速提高 · 六只疾狼正在驰援":"半血时会狂暴，留好箭雨应对援军");sound.play("boss")}
+    if(e==="kill")sound.play(type==="boss"?"won":"kill");
+    if(e==="start"&&stage.opening)feedback.cue(stage.opening.names[g.wave-1],stage.opening.hints[g.wave-1]);
     if(e==="sell"){selected=hover=null;manageKey=""}
     if(["build","sell","salvage"].includes(e))installPads();
     if(e==="won"||e==="lost"||e==="start")setBuildGrid(false);
@@ -221,8 +233,9 @@
     if(e==="cleared")msg("击退第 "+g.wave+" 波　+"+PineGame.waveReward(g.wave)+" 军费"+(type?.rescued?" · 收留 1 名幸存者":"")+(type?.repaired?" · 修复 "+type.repaired+" 点城门生命":""));
     if(e==="kill"||e==="leak")return;
     save();update();
+    if(e==="cleared"&&stage.opening&&g.wave===2&&!g.doctrine)chooseBattleDoctrine();
   }
-  function manage(){const pane=$("manage"),t=g.towers[selected];if(!t)return;const cost=upgradeCost(t),key=[selected,t.level,g.gold>=cost,g.ended].join();if(manageKey===key)return;manageKey=key;const stats=levelStats(t.type,t.level);
+  function manage(){const pane=$("manage"),t=g.towers[selected];if(!t)return;const cost=upgradeCost(t),key=[selected,t.level,g.gold>=cost,g.ended,g.doctrine,g.bannerTime>0].join();if(manageKey===key)return;manageKey=key;const stats=g.towerStats(t);
     pane.innerHTML='<button class="back-button">← 返回工坊</button><div class="manage-heading"><div><h3>'+towers[t.type].name+'</h3><p>等级 '+t.level+' / 3</p></div></div><p>'+towers[t.type].description+'</p><div class="stats-line"><span>攻击<strong>'+stats.damage+'</strong></span><span>射程<strong>'+stats.range+'</strong></span><span>间隔<strong>'+stats.delay.toFixed(2)+'s</strong></span></div>';
     const box=pane.querySelector(".manage-heading");box.prepend(art(t.type,box));pane.querySelector(".back-button").onclick=()=>choose(choice);
     const b=btn(t.level===3?"已达最高等级":"升级 · "+cost+" 军费","primary",()=>{if(g.upgrade(selected))msg("防御塔升至 "+t.level+" 级")});b.disabled=t.level>=3||g.gold<cost||g.ended;pane.append(b);
@@ -231,7 +244,7 @@
   function intel(){const n=Math.min(stage.waves,g.phase==="ready"?g.wave+1:Math.max(1,g.wave)),key=n+"/"+profile.chapter;if(intelKey===key)return;intelKey=key;$("intel-wave").textContent="WAVE "+fmt(n);const counts=stage.lineup[n-1],type=["boss","brute","runner","scout"].find(t=>counts[t]),row=make("div","intel-row");art(type,row,true);
     const formation=stage.formations[n-1];
     const reports={pack:["狼群突袭","疾狼将在队伍中段成群冲刺。箭塔守后段，寒霜塔卡弯道。"],vanguard:["铁甲先遣","铁甲兵打头阵。用炮塔穿甲，或先用寒霜破甲再集火。"],escort:["领主护送","重甲卫队先行，领主随后入场。留出一段冰炮交叉火力。"],mixed:["混编推进",units[type].hint]};
-    const [name,hint]=reports[formation];
+    const [name,hint]=stage.opening?[stage.opening.names[n-1],stage.opening.hints[n-1]]:reports[formation];
     $("intel-wave").textContent="第 "+n+" 波 · "+name;
     const d=make("div"),title=make("strong"),list=make("p"),tip=make("p");
     title.textContent=units[type].name+" ×"+counts[type];list.textContent=Object.entries(counts).filter(([k])=>k!==type).map(([k,v])=>units[k].name+" ×"+v).join(" · ");tip.textContent=hint;
@@ -239,6 +252,7 @@
   const handButtons=cardIds.map(id=>{const b=make("button","hand-card "+id);b.dataset.card=id;b.innerHTML='<i data-icon="'+items[id].sigil+'"></i><span>'+items[id].name+'</span><small></small>';b.title=items[id].desc;
     b.onclick=()=>{if(!P.use(profile,g,id))return;save();update();dirty=true;sound.play("card");msg(items[id].name+" 已生效");$("map-area").animate?.([{filter:"brightness(1.3)"},{filter:"brightness(1)"}],{duration:330})};$("hand").append(b);return b});
   function update(){
+    feedback.update(g,stage);
     const nextStorm=!g.ended&&(g.phase==="ready"?g.wave+1:g.wave)%3===0;
     $("camp-open").textContent=g.cold?"缺柴 "+g.camp.shortfall:nextStorm?(g.phase==="ready"?"风雪将至":"供暖中"):"营地";
     $("camp-open").classList.toggle("storm-alert",nextStorm);
@@ -260,7 +274,7 @@
     handButtons.forEach((b,i)=>{const id=cardIds[i],n=profile.cards[id]||0;b.querySelector("small").textContent="×"+n;b.disabled=!n||!P.allowed(g,id);b.title=items[id].desc+(n?"":" 渡鸦商店可补给。")});intel();
   }
   let lastProjection="";
-  function draw(){renderer.render(g,selected,choice,hover);drawBuildGrid();const key=[renderer.w,renderer.h,renderer.angle,renderer.pitch,renderer.zoom,renderer.viewHeight,profile.chapter,...g.towers.map(t=>!!t),...g.supplyHealth.map(Boolean)].join();if(key!==lastProjection){lastProjection=key;pads.forEach((b,i)=>{if(!b)return;const [x,z]=g.pads[i],t=g.towers[i],[px,py,depth]=renderer.project(x,g.supplyHealth[i-g.baseSites]?7:t?12:3,z);b.hidden=(!t&&!g.supplyHealth[i-g.baseSites])||px<0||px>renderer.w||py<0||py>renderer.h;b.style.left=px/renderer.w*100+"%";b.style.top=py/renderer.h*100+"%";b.style.zIndex=String(Math.round(300+depth));b.style.height=t?"9%":"6.3%"})}dirty=false}
+  function draw(){renderer.render(g,selected,choice,hover);drawBuildGrid();feedback.draw(g,renderer);const key=[renderer.w,renderer.h,renderer.angle,renderer.pitch,renderer.zoom,renderer.viewHeight,profile.chapter,...g.towers.map(t=>!!t),...g.supplyHealth.map(Boolean)].join();if(key!==lastProjection){lastProjection=key;pads.forEach((b,i)=>{if(!b)return;const [x,z]=g.pads[i],t=g.towers[i],[px,py,depth]=renderer.project(x,g.supplyHealth[i-g.baseSites]?7:t?12:3,z);b.hidden=(!t&&!g.supplyHealth[i-g.baseSites])||px<0||px>renderer.w||py<0||py>renderer.h;b.style.left=px/renderer.w*100+"%";b.style.top=py/renderer.h*100+"%";b.style.zIndex=String(Math.round(300+depth));b.style.height=t?"9%":"6.3%"})}dirty=false}
   function animate(now){const dt=stamp?Math.min(.15,(now-stamp)/1000):0;stamp=now;const active=g.phase==="fight"&&!modal&&!g.paused&&!document.hidden;
     if(active){clock+=dt*g.speed;while(clock>=1/40){g.step(1/40);clock-=1/40}if(now-uiAt>180){update();uiAt=now}if(now-saveAt>1500){save();saveAt=now}}
     if((active||dirty||renderer.dirty)&&now-paintAt>(renderer.gl?25:65)){draw();paintAt=now}
@@ -349,7 +363,8 @@
   function switchChapter(i){if(i===profile.chapter&&!g.ended){closeDialog();return}if(!g.ended&&(g.wave>0||g.towers.some(t=>t&&t.spent>0)))dialog("switch","CAMPAIGN","离开当前守城？","<p>进入其他章节后，本章将从第一波重新开始。已获得的钱包金币、手牌和装扮保留。</p>",[["前往"+chapters[i].name,()=>enter(i)],["留在本章",closeDialog,"secondary"]]);else enter(i)}
   function outcome(){
     const won=g.phase==="won",final=won&&profile.chapter===chapters.length-1,reward=profile.run?.payout;
-    const html=won?'<div class="chapter-prose">'+para(stage.after)+'</div><div class="settlement"><span>结余军费 <b>'+g.gold+'</b></span><span>首通奖励 <b>'+(reward?.bonus||0)+'</b></span><span>存入钱包 <b>+'+(reward?.earned||0)+'</b></span></div>':'<p>防线守到了第 '+g.wave+' 波。先在连续弯道布置箭塔，把炮塔留给成群的敌军。已购装扮与剩余手牌可带入重试。</p>';
+    const unlock=won&&stage.opening?'<div class="unlock-reward"><small>永久能力 · 已获得</small><h3>'+stage.opening.reward.name+'</h3><p>'+stage.opening.reward.desc+'</p></div><p class="next-hook">'+stage.opening.reward.next+'</p><p>本局最高 '+g.bestCombo+' 连击'+(reward?.cardBonus?' · 完成额外挑战，寒潮卡 +1':'')+'</p>':'';
+    const html=won?unlock+'<div class="chapter-prose">'+para(stage.after)+'</div><div class="settlement"><span>结余军费 <b>'+g.gold+'</b></span><span>首通奖励 <b>'+(reward?.bonus||0)+'</b></span><span>存入钱包 <b>+'+(reward?.earned||0)+'</b></span></div>':'<p>防线守到了第 '+g.wave+' 波。先在连续弯道布置箭塔，把炮塔留给成群的敌军。已购装扮与剩余手牌可带入重试。</p>'+(stage.opening?'<p>试试换一种本局强化；箭雨留给集中冲锋的敌群，击杀后还能再次充能。</p>':'');
     const actions=won?(final?[["回顾战役纪事",journal],["返回沙盘",closeDialog,"secondary"]]:[["前往"+chapters[profile.chapter+1].name,()=>enter(profile.chapter+1)],["逛逛商店",shop,"secondary"]]):[["本局重来",restartChapter],["补给道具",shop,"secondary"]];
     if(won)actions.push(["本局重来",restartChapter,"secondary"]);
     dialog("result",final?"EPILOGUE · 终章":won?"CHAPTER CLEAR · 第 "+chapterNo()+" 章":"BATTLE REPORT",final?"大结局 · 万家回灯":won?stage.name+"守住了":"城门失守",html+(won?"<p>"+(g.clearedSupplies===g.supplies.length?"✦ 获得本章全清勋章":"物资清理 "+g.clearedSupplies+" / "+g.supplies.length)+"</p>":""),actions);
@@ -372,7 +387,7 @@
       const b=btn(equipped?"已装备":owned?"装备":item.price+" 金币","secondary",()=>{if(!P.purchase(profile,id))return;save();if(item.kind==="skin"){refreshTerrain();document.querySelectorAll(".tower-image").forEach(box=>{const type=box.querySelector("canvas").dataset.model;box.replaceChildren();art(type,box)});manageKey=intelKey="";dirty=true;draw()}update();shopItems();$("shop-feedback").textContent=item.name+(item.kind==="skin"?" 已装备":" 已放入手牌");sound.play("purchase")});
       b.dataset.buy=id;b.disabled=equipped||(!owned&&profile.bank<item.price);row.append(b);list.append(row)}
   }
-  $("start").onclick=()=>g.ended?outcome():g.start();$("speed").onclick=()=>{g.speed=g.speed===1?2:g.speed===2?3:1;save();update()};
+  $("start").onclick=()=>g.ended?outcome():stage.opening&&g.wave>=2&&!g.doctrine?chooseBattleDoctrine():g.start();$("speed").onclick=()=>{g.speed=g.speed===1?2:g.speed===2?3:1;save();update()};
   function pause(){if(modal||g.ended)return;g.paused=!g.paused;save();dirty=true;update()}
   $("pause").onclick=pause;$("battle-nav").onclick=()=>{if(modal)closeDialog();$("map-area").scrollIntoView({block:"nearest"})};
   $("shop-btn").onclick=$("cards-store").onclick=shop;$("chapters-btn").onclick=$("read-journal").onclick=journal;

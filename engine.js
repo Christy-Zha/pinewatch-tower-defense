@@ -44,7 +44,29 @@
       const post=this.point(Math.min(67,this.length*.12));
       this.post=stage?.post||[post.x+Math.cos(post.yaw)*13,post.y-Math.sin(post.yaw)*13];this.reset();
     }
-    reset(){this.camp=newCamp();this.cleared=new Set();this.pads.length=this.fixedSites;this.supplyHealth=this.supplies.map(c=>c.hp);this.markedSupply=null;this.gold=(this.stage?.gold??180)+60;this.health=20;this.wave=0;this.kills=0;this.phase="ready";this.paused=false;this.speed=1;this.towers=this.pads.map(()=>null);this.enemies=[];this.shots=[];this.particles=[];this.queue=[];this.spawnIn=0;this.time=0;this.defeated=0;this.serial=0;this.waveSize=0;this.ranger={x:this.post[0],z:this.post[1],yaw:-.25,target:null,cycle:0,released:false}}
+    reset(){this.encounterVersion=2;this.doctrine=null;this.mastery={};this.volleyCharge=100;this.bannerTime=0;this.impacts=[];this.floaters=[];this.combo=0;this.comboUntil=0;this.bestCombo=0;
+      this.camp=newCamp();this.cleared=new Set();this.pads.length=this.fixedSites;this.supplyHealth=this.supplies.map(c=>c.hp);this.markedSupply=null;this.gold=(this.stage?.gold??180)+60;this.health=20;this.wave=0;this.kills=0;this.phase="ready";this.paused=false;this.speed=1;this.towers=this.pads.map(()=>null);this.enemies=[];this.shots=[];this.particles=[];this.queue=[];this.spawnIn=0;this.time=0;this.defeated=0;this.serial=0;this.waveSize=0;this.ranger={x:this.post[0],z:this.post[1],yaw:-.25,target:null,cycle:0,released:false}}
+    chooseDoctrine(id){
+      if(!this.stage?.opening||this.phase!=="ready"||this.wave<2||this.doctrine||!["rapid","siege"].includes(id))return false;
+      this.doctrine=id;this.onEvent("doctrine");return true;
+    }
+    towerStats(t){
+      const s=levelStats(t.type,t.level);
+      if(this.doctrine==="rapid"&&t.type==="arrow")s.delay/=1.3;
+      if(this.doctrine==="siege"&&t.type==="cannon")s.damage=Math.round(s.damage*1.3);
+      if(this.bannerTime>0)s.delay/=1.3;
+      return s;
+    }
+    get canVolley(){return (this.stage?.opening||this.mastery.volley)&&this.phase==="fight"&&!this.paused&&this.volleyCharge>=100&&this.enemies.some(e=>e.hp>0)}
+    volley(){
+      if(!this.canVolley)return false;
+      this.volleyCharge=0;if(this.mastery.banner)this.bannerTime=6;
+      for(const e of this.enemies){if(e.hp<=0)continue;e.hp-=e.type==="boss"?35:65;e.slow=Math.max(e.slow||0,2);
+        this.shots.push({x:e.x-12,y:e.y-8,tx:e.x,ty:e.y,type:"volley",ttl:.38,max:.38});this.impact(e.x,e.y,"#ffdf82",15);
+      }
+      this.onEvent("volley");return true;
+    }
+    impact(x,z,color,size){this.impacts.push({x,z,color,size,ttl:.45,max:.45});if(this.impacts.length>32)this.impacts.shift()}
     get ended(){return this.phase==="won"||this.phase==="lost"}
     get fixedSites(){return this.baseSites+this.supplies.length}
     campForecast(wave){
@@ -126,6 +148,8 @@
     burst(x,y,color,n){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,speed=5+Math.random()*19;this.particles.push({x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed-8,color,ttl:.25+Math.random()*.2})}}
     fire(i,t,target,stats){
       const [x,y]=this.pads[i],type=t.type;
+      t.kick=.16;target.flash=.18;
+      this.impact(target.x,target.y,type==="frost"?"#a6efff":type==="venom"?"#acd973":"#ffcc78",type==="cannon"?22:type==="frost"?12:5);
       t.yaw=Math.atan2(target.x-x,target.y-y);this.shots.push({x,y,tx:target.x,ty:target.y,type,ttl:.29,max:.29});
       if(type==="storm"){
         let last=target,damage=stats.damage;const hit=new Set([target]);target.hp-=damage;
@@ -139,7 +163,7 @@
       }else if(type==="venom"){
         target.hp-=stats.damage;target.poison=4;target.toxin=Math.max(target.toxin||0,stats.damage*.5);
       }else if(type==="ballista")target.hp-=stats.damage*(["brute","boss"].includes(target.type)?1.5:1);
-      else if(type==="cannon"){for(const e of this.enemies){if(Math.hypot(e.x-target.x,e.y-target.y)<=22)e.hp-=stats.damage*(e.type==="runner"?.6:1)}this.burst(target.x,target.y-3,"#ffc272",9)}
+      else if(type==="cannon"){for(const e of this.enemies){if(Math.hypot(e.x-target.x,e.y-target.y)<=22){const shatter=this.mastery.shatter&&(e.slow>0||e.frozen>0);e.hp-=stats.damage*(e.type==="runner"?.6:1)*(shatter?1.3:1);if(shatter)this.impact(e.x,e.y,"#acffff",18)}}this.burst(target.x,target.y-3,"#ffc272",9)}
       else{target.hp-=type==="arrow"?arrowDamage(target,stats.damage):stats.damage;if(type==="frost"){target.slow=2;this.burst(target.x,target.y-3,"#ade6f0",4)}}
       this.onEvent("shot",type);
     }
@@ -178,18 +202,25 @@
     }
     step(dt){
       if(this.paused||this.phase!=="fight")return;
-      this.time+=dt;this.spawnIn-=dt;
+      this.time+=dt;this.spawnIn-=dt;this.bannerTime=Math.max(0,this.bannerTime-dt);
+      for(const t of this.towers)if(t)t.kick=Math.max(0,(t.kick||0)-dt);
+      for(const f of this.floaters)f.ttl-=dt;this.floaters=this.floaters.filter(f=>f.ttl>0);
+      for(const p of this.impacts)p.ttl-=dt;this.impacts=this.impacts.filter(p=>p.ttl>0);
       if(this.queue.length&&this.spawnIn<=0){
         const type=this.queue.shift(),u=units[type],hp=Math.round(u.hp*(this.stage?.hp||1)*(1+(this.wave-1)*.215));
         this.enemies.push({id:++this.serial,type,hp,maxHp:hp,d:0,slow:0,frozen:0,...this.point(0)});
+        if(type==="boss"&&this.stage?.opening?.boss)this.onEvent("boss");
         const pack=this.stage?.formations?.[this.wave-1]==="pack"&&type==="runner"&&this.queue[0]==="runner";
         this.spawnIn+=Math.max(.54,1.05-this.wave*.041)*(this.stage?.rate||1)*(pack ? .5 : 1);
       }
-      for(const e of this.enemies){if(e.poison>0){e.hp-=Math.min(dt,e.poison)*e.toxin;e.poison=Math.max(0,e.poison-dt);if(!e.poison)e.toxin=0}e.slow=Math.max(0,e.slow-dt);e.frozen=Math.max(0,(e.frozen||0)-dt);if(!e.frozen)e.d+=units[e.type].speed*(e.slow>0?.55:1)*dt;Object.assign(e,this.point(e.d))}
+      for(const e of this.enemies){
+        if(e.type==="boss"&&this.stage?.opening?.boss&&!e.enraged&&e.hp>0&&e.hp<=e.maxHp*.5){e.enraged=true;this.queue.unshift(...Array(6).fill("runner"));this.waveSize+=6;this.impact(e.x,e.y,"#ff7750",30);this.onEvent("rage")}
+        e.flash=Math.max(0,(e.flash||0)-dt);
+        if(e.poison>0){e.hp-=Math.min(dt,e.poison)*e.toxin;e.poison=Math.max(0,e.poison-dt);if(!e.poison)e.toxin=0}e.slow=Math.max(0,e.slow-dt);e.frozen=Math.max(0,(e.frozen||0)-dt);if(!e.frozen)e.d+=units[e.type].speed*(e.slow>0?.55:1)*(e.enraged?1.25:1)*dt;Object.assign(e,this.point(e.d))}
       this.aimRanger(dt);
       const towerTime=this.cold?dt*.8:dt;
       for(let i=0;i<this.towers.length;i++){const t=this.towers[i];if(!t)continue;t.cd=Math.max(0,t.cd-towerTime);if(t.cd>0)continue;
-        const stats=levelStats(t.type,t.level),[x,y]=this.pads[i];let target=null;
+        const stats=this.towerStats(t),[x,y]=this.pads[i];let target=null;
         if(this.markedSupply!==null&&this.clearSupply(i,t,stats)){t.cd=stats.delay;continue}
         let priority=-Infinity;
         for(const e of this.enemies){
@@ -200,7 +231,10 @@
         if(target){this.fire(i,t,target,stats);t.cd=stats.delay}
       }
       this.enemies=this.enemies.filter(e=>{
-        if(e.hp<=0){this.kills++;this.defeated++;this.gold+=units[e.type].bounty;this.burst(e.x,e.y-4,"#edd687",5);this.onEvent("kill");return false}
+        if(e.hp<=0){this.kills++;this.defeated++;this.gold+=units[e.type].bounty;this.volleyCharge=Math.min(100,this.volleyCharge+9);
+          this.combo=this.time<=this.comboUntil?this.combo+1:1;this.comboUntil=this.time+2;this.bestCombo=Math.max(this.bestCombo,this.combo);
+          this.floaters.push({x:e.x,z:e.y,text:"+"+units[e.type].bounty,ttl:.85});if(this.floaters.length>24)this.floaters.shift();
+          this.burst(e.x,e.y-4,"#edd687",e.type==="boss"?20:7);this.impact(e.x,e.y,"#ffe9a3",e.type==="boss"?32:9);this.onEvent("kill",e.type);return false}
         if(e.d>=this.length){this.defeated++;this.health=Math.max(0,this.health-units[e.type].leak);this.onEvent("leak");return false}return true;
       });
       for(const p of this.particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.ttl-=dt}this.particles=this.particles.filter(p=>p.ttl>0);
@@ -213,7 +247,7 @@
           this.health=Math.min(20,this.health+this.camp.level-1);
         }
         this.camp.shortfall=0;
-        this.shots=[];this.particles=[];this.phase=this.wave===this.waves.length?"won":"ready";
+        this.shots=[];this.particles=[];this.impacts=[];this.floaters=[];for(const t of this.towers)if(t)t.kick=0;this.phase=this.wave===this.waves.length?"won":"ready";
         if(this.phase==="ready")this.gold+=waveReward(this.wave);
         this.onEvent(this.phase==="won"?"won":"cleared",{rescued:this.camp.people-before,repaired:this.health-gate});
       }
