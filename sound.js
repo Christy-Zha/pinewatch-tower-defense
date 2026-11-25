@@ -64,29 +64,39 @@
       osc.connect(gain);gain.connect(this.master);osc.onended=()=>{osc.disconnect();gain.disconnect()};
       osc.start(t);osc.stop(end+.005);
     }
+    rumble(){
+      const ctx=this.context,now=ctx.currentTime;
+      if(now-(this.lastRumble??-1)<.12)return;this.lastRumble=now;
+      if(!this.noise){this.noise=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.55),ctx.sampleRate);const data=this.noise.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*(1-i/data.length)}
+      const source=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();source.buffer=this.noise;filter.type="lowpass";filter.frequency.setValueAtTime(1700,now);filter.frequency.exponentialRampToValueAtTime(130,now+.5);gain.gain.setValueAtTime(.22,now);gain.gain.exponentialRampToValueAtTime(.0001,now+.52);source.connect(filter);filter.connect(gain);gain.connect(this.master);source.onended=()=>{source.disconnect();filter.disconnect();gain.disconnect()};source.start(now);source.stop(now+.55);
+    }
     play(cue){
       if(!this.enabled||document.hidden)return;
       if(!this.running){if(this.starting)this.pending=cue;return}
       const n=(...args)=>this.note(...args);
-      if(["ranger","arrow","frost","cannon","storm","ballista","venom"].includes(cue)){
+      if(cue==="cannon"){
+        const t=this.context.currentTime;if(t-(this.lastCannon??-1)<.12)return;this.lastCannon=t;
+      }else if(["ranger","arrow","frost","storm","ballista","venom"].includes(cue)){
         const t=this.context.currentTime;if(t-this.lastShot<.085)return;this.lastShot=t;
       }
       switch(cue){
         case "kill":{
           const now=this.context.currentTime;if(now-(this.lastKill||0)<.12)return;this.lastKill=now;
-          n("sine",880,1320,.09,.12);break;
+          n("triangle",510,175,.075,.15);n("sine",980,1480,.12,.11,.025);break;
         }
         case "volley":
           [0,.06,.12].forEach(d=>n("sawtooth",600,85,.25,.10,d));n("sine",160,40,.45,.35,.15);break;
         case "boss":
           n("sawtooth",110,70,.6,.17);n("triangle",165,82,.5,.24,.22);break;
+        case "bossfall":
+          this.rumble();n("sine",100,28,.65,.38);[587,784,988].forEach((hz,i)=>n("triangle",hz,hz,.22,.18,.15+i*.1));break;
         case "ranger":case "arrow":
           n("triangle",840,165,.16,.30);n("sine",310,100,.11,.16,.012);break;
         case "ballista": n("triangle",350,90,.21,.32);break;
         case "venom": n("sine",510,155,.13,.17);break;
         case "storm": n("sawtooth",460,100,.12,.12);break;
         case "cannon":
-          n("triangle",198,42,.35,.48);n("sine",430,77,.12,.21);break;
+          this.rumble();n("triangle",155,37,.38,.43);n("sine",68,30,.45,.32);n("sine",430,77,.09,.14);break;
         case "frost":
           n("sine",990,1330,.23,.22);n("sine",1510,1000,.19,.13,.055);break;
         case "build":case "upgrade":

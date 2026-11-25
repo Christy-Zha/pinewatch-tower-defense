@@ -36,8 +36,25 @@
     }
     draw(g,r){
       const c=this.canvas,ctx=this.ctx;if(c.width!==r.w||c.height!==r.h){c.width=r.w;c.height=r.h}else ctx.clearRect(0,0,c.width,c.height);
-      const dpr=r.dpr;ctx.textAlign='center';ctx.font='bold '+Math.round(14*dpr)+'px system-ui';ctx.lineWidth=3*dpr;
-      for(const f of g.floaters||[]){const [x,y]=r.project(f.x,18+(1-f.ttl/.85)*12,f.z);ctx.globalAlpha=Math.min(1,f.ttl*3);ctx.strokeStyle='#27311d';ctx.fillStyle='#ffe29a';ctx.strokeText(f.text,x,y);ctx.fillText(f.text,x,y)}
+      const dpr=r.dpr;
+      // Small, localized effects leave the route and touch targets readable.
+      for(const p of (g.impacts||[]).filter(p=>p.kind==='blast'||p.kind==='death').slice(-16)){
+        const f=1-p.ttl/p.max,[x,y]=r.project(p.x,4,p.z),radius=Math.max(2,p.size*r.scale),blast=p.kind==='blast';
+        ctx.save();ctx.lineWidth=(blast?2.5:1.5)*dpr;ctx.globalAlpha=(1-f)*.8;ctx.strokeStyle=blast?'#ffe8a6':'#fff4c2';
+        ctx.beginPath();ctx.ellipse(x,y,radius*(.3+f*1.3),radius*(.3+f*1.3)*.48,0,0,Math.PI*2);ctx.stroke();
+        if(blast){
+          // Fire core, then drifting smoke. No full-screen flashes or camera displacement.
+          if(f<.55){const size=radius*(.42+Math.sin(Math.min(1,f*2.3)*Math.PI)*.48),cy=y-radius*.25;
+            const light=ctx.createRadialGradient(x,cy,0,x,cy,size);light.addColorStop(0,'#ffffe6');light.addColorStop(.22,'#ffe382');light.addColorStop(.55,'#ff9a35');light.addColorStop(.8,'#ef4b1d99');light.addColorStop(1,'#ef4b1d00');ctx.fillStyle=light;ctx.globalAlpha=Math.min(1,(.55-f)*3);ctx.beginPath();ctx.arc(x,cy,size,0,Math.PI*2);ctx.fill();
+          }
+          for(let i=0;i<5;i++){const a=i*2.4+p.x,px=x+Math.cos(a)*radius*f*.6,py=y-radius*(.2+f*.7)+Math.sin(a)*radius*f*.2,size=radius*(.14+f*.22);ctx.globalAlpha=Math.sin(f*Math.PI)*.23;ctx.fillStyle=i%2?'#6c655a':'#a1957d';ctx.beginPath();ctx.arc(px,py,size,0,Math.PI*2);ctx.fill()}
+        }
+        const sparks=blast?9:7;ctx.globalAlpha=(1-f)*.95;ctx.strokeStyle=blast?'#ffdf7d':'#fff0a5';ctx.lineWidth=2*dpr;
+        for(let i=0;i<sparks;i++){const a=i*Math.PI*2/sparks+p.z*.1,distance=radius*(.18+f),sx=x+Math.cos(a)*distance,sy=y+Math.sin(a)*distance*.65-radius*Math.sin(f*Math.PI)*.3;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx-Math.cos(a)*(blast?6:4)*dpr*(1-f),sy-Math.sin(a)*4*dpr*(1-f));ctx.stroke()}
+        ctx.restore();
+      }
+      ctx.textAlign='center';ctx.lineWidth=3*dpr;
+      for(const f of (g.floaters||[]).slice(-24)){const damage=f.kind==='damage',[x,y]=r.project(f.x,(damage?26:15)+(1-f.ttl/(f.max||.85))*14,f.z);ctx.font='bold '+Math.round((damage?13:15)*dpr)+'px system-ui';ctx.globalAlpha=Math.min(1,f.ttl*4);ctx.strokeStyle='#27311d';ctx.fillStyle=damage?'#fff3df':'#ffe29a';ctx.strokeText(f.text,x,y);ctx.fillText(f.text,x,y)}
       ctx.globalAlpha=1;
       if(g.phase==='fight'&&performance.now()<this.flashUntil){ctx.fillStyle='#ffe4a324';ctx.fillRect(0,0,c.width,c.height)}
     }

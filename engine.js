@@ -44,7 +44,7 @@
       const post=this.point(Math.min(67,this.length*.12));
       this.post=stage?.post||[post.x+Math.cos(post.yaw)*13,post.y-Math.sin(post.yaw)*13];this.reset();
     }
-    reset(){this.encounterVersion=2;this.doctrine=null;this.mastery={};this.volleyCharge=100;this.bannerTime=0;this.impacts=[];this.floaters=[];this.combo=0;this.comboUntil=0;this.bestCombo=0;
+    reset(){this.encounterVersion=2;this.doctrine=null;this.mastery={};this.volleyCharge=100;this.bannerTime=0;this.impacts=[];this.floaters=[];this.deaths=[];this.combo=0;this.comboUntil=0;this.bestCombo=0;
       this.camp=newCamp();this.cleared=new Set();this.pads.length=this.fixedSites;this.supplyHealth=this.supplies.map(c=>c.hp);this.markedSupply=null;this.gold=(this.stage?.gold??180)+60;this.health=20;this.wave=0;this.kills=0;this.phase="ready";this.paused=false;this.speed=1;this.towers=this.pads.map(()=>null);this.enemies=[];this.shots=[];this.particles=[];this.queue=[];this.spawnIn=0;this.time=0;this.defeated=0;this.serial=0;this.waveSize=0;this.ranger={x:this.post[0],z:this.post[1],yaw:-.25,target:null,cycle:0,released:false}}
     chooseDoctrine(id){
       if(!this.stage?.opening||this.phase!=="ready"||this.wave<2||this.doctrine||!["rapid","siege"].includes(id))return false;
@@ -61,12 +61,31 @@
     volley(){
       if(!this.canVolley)return false;
       this.volleyCharge=0;if(this.mastery.banner)this.bannerTime=6;
-      for(const e of this.enemies){if(e.hp<=0)continue;e.hp-=e.type==="boss"?35:65;e.slow=Math.max(e.slow||0,2);
+      for(const e of this.enemies){if(e.hp<=0)continue;this.hit(e,e.type==="boss"?35:65,"volley",e.x-12,e.y-8);e.slow=Math.max(e.slow||0,2);
         this.shots.push({x:e.x-12,y:e.y-8,tx:e.x,ty:e.y,type:"volley",ttl:.38,max:.38});this.impact(e.x,e.y,"#ffdf82",15);
       }
       this.onEvent("volley");return true;
     }
-    impact(x,z,color,size){this.impacts.push({x,z,color,size,ttl:.45,max:.45});if(this.impacts.length>32)this.impacts.shift()}
+    impact(x,z,color,size,kind="ring"){
+      const life=kind==="blast"?.8:kind==="death"?.7:.35;
+      this.impacts.push({x,z,color,size,kind,ttl:life,max:life});if(this.impacts.length>40)this.impacts.shift();
+    }
+    hit(e,damage,type,x,z,showNumber=true){
+      e.hp-=damage;e.flash=.22;e.hitPose=e.d;
+      const length=Math.hypot(e.x-x,e.y-z)||1,power=type==="cannon"?3.2:type==="ballista"?2.5:1.3;
+      e.recoilX=(e.x-x)/length*power;e.recoilZ=(e.y-z)/length*power;
+      const big=type==="cannon"||type==="ballista";
+      if(showNumber&&(big||e.type==="boss")){
+        this.floaters.push({x:e.x,z:e.y,text:"−"+Math.round(damage),kind:"damage",ttl:.65,max:.65});
+        if(this.floaters.length>32)this.floaters.shift();
+      }
+    }
+    get hasEffects(){return !!(this.impacts.length||this.deaths.length||this.floaters.length||this.particles.length||this.shots.length||this.towers.some(t=>t?.kick>0))}
+    tickEffects(dt){
+      for(const t of this.towers)if(t)t.kick=Math.max(0,(t.kick||0)-dt);
+      for(const key of ["impacts","floaters","deaths","shots"]){for(const p of this[key])p.ttl-=dt;this[key]=this[key].filter(p=>p.ttl>0)}
+      for(const p of this.particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.ttl-=dt}this.particles=this.particles.filter(p=>p.ttl>0);
+    }
     get ended(){return this.phase==="won"||this.phase==="lost"}
     get fixedSites(){return this.baseSites+this.supplies.length}
     campForecast(wave){
@@ -145,26 +164,26 @@
       if(wolves)this.queue.splice(Math.floor(this.queue.length*.45),0,...Array(wolves).fill("runner"));
       this.waveSize=this.queue.length;this.spawnIn=.3;this.onEvent("start");return true;
     }
-    burst(x,y,color,n){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,speed=5+Math.random()*19;this.particles.push({x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed-8,color,ttl:.25+Math.random()*.2})}}
+    burst(x,y,color,n){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,speed=9+Math.random()*25;this.particles.push({x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed-8,color,ttl:.3+Math.random()*.25})}if(this.particles.length>160)this.particles.splice(0,this.particles.length-160)}
     fire(i,t,target,stats){
       const [x,y]=this.pads[i],type=t.type;
-      t.kick=.16;target.flash=.18;
-      this.impact(target.x,target.y,type==="frost"?"#a6efff":type==="venom"?"#acd973":"#ffcc78",type==="cannon"?22:type==="frost"?12:5);
-      t.yaw=Math.atan2(target.x-x,target.y-y);this.shots.push({x,y,tx:target.x,ty:target.y,type,ttl:.29,max:.29});
+      t.kick=type==="cannon"?.24:.16;
+      this.impact(target.x,target.y,type==="frost"?"#a6efff":type==="venom"?"#acd973":"#ffcc78",type==="cannon"?22:type==="frost"?12:5,type==="cannon"?"blast":"ring");
+      t.yaw=Math.atan2(target.x-x,target.y-y);const flight=type==="cannon"?.12:.29;this.shots.push({x,y,tx:target.x,ty:target.y,type,ttl:flight,max:flight});
       if(type==="storm"){
-        let last=target,damage=stats.damage;const hit=new Set([target]);target.hp-=damage;
+        let last=target,damage=stats.damage;const hit=new Set([target]);this.hit(target,damage,type,x,y);
         for(let jump=0;jump<2;jump++){
           let next=null,reach=29;
           for(const e of this.enemies){const d=Math.hypot(e.x-last.x,e.y-last.y);if(e.hp>0&&!hit.has(e)&&d<=reach){next=e;reach=d}}
           if(!next)break;
-          damage=Math.round(damage*.7);next.hp-=damage;hit.add(next);
+          damage=Math.round(damage*.7);this.hit(next,damage,type,last.x,last.y);hit.add(next);
           this.shots.push({x:last.x,y:last.y,tx:next.x,ty:next.y,type,arc:true,ttl:.24,max:.24});last=next;
         }
       }else if(type==="venom"){
-        target.hp-=stats.damage;target.poison=4;target.toxin=Math.max(target.toxin||0,stats.damage*.5);
-      }else if(type==="ballista")target.hp-=stats.damage*(["brute","boss"].includes(target.type)?1.5:1);
-      else if(type==="cannon"){for(const e of this.enemies){if(Math.hypot(e.x-target.x,e.y-target.y)<=22){const shatter=this.mastery.shatter&&(e.slow>0||e.frozen>0);e.hp-=stats.damage*(e.type==="runner"?.6:1)*(shatter?1.3:1);if(shatter)this.impact(e.x,e.y,"#acffff",18)}}this.burst(target.x,target.y-3,"#ffc272",9)}
-      else{target.hp-=type==="arrow"?arrowDamage(target,stats.damage):stats.damage;if(type==="frost"){target.slow=2;this.burst(target.x,target.y-3,"#ade6f0",4)}}
+        this.hit(target,stats.damage,type,x,y);target.poison=4;target.toxin=Math.max(target.toxin||0,stats.damage*.5);
+      }else if(type==="ballista")this.hit(target,stats.damage*(["brute","boss"].includes(target.type)?1.5:1),type,x,y);
+      else if(type==="cannon"){for(const e of this.enemies){if(Math.hypot(e.x-target.x,e.y-target.y)<=22){const shatter=this.mastery.shatter&&(e.slow>0||e.frozen>0);this.hit(e,stats.damage*(e.type==="runner"?.6:1)*(shatter?1.3:1),type,x,y,e===target||e.type==="boss");if(shatter)this.impact(e.x,e.y,"#acffff",18)}}this.burst(target.x,target.y-3,"#ffc272",18)}
+      else{this.hit(target,type==="arrow"?arrowDamage(target,stats.damage):stats.damage,type,x,y);if(type==="frost"){target.slow=2;this.burst(target.x,target.y-3,"#ade6f0",4)}}
       this.onEvent("shot",type);
     }
     clearSupply(i,t,stats){
@@ -173,6 +192,7 @@
       t.yaw=Math.atan2(c.x-x,c.z-y);
       this.shots.push({x,y,tx:c.x,ty:c.z,type:t.type,ttl:.29,max:.29});
       this.onEvent("shot",t.type);
+      if(t.type==="cannon")this.impact(c.x,c.z,"#ffcc78",22,"blast");
       this.supplyHealth[j]=Math.max(0,this.supplyHealth[j]-stats.damage);
       if(!this.supplyHealth[j]){
         this.gold+=c.gold;this.markedSupply=null;
@@ -192,7 +212,7 @@
       if(target)r.yaw=Math.atan2(target.x-r.x,target.y-r.z);
       r.cycle+=dt/1.9;
       if(!r.released&&r.cycle>=.65&&target){
-        r.released=true;target.hp-=arrowDamage(target,9);
+        r.released=true;this.hit(target,arrowDamage(target,9),"ranger",r.x,r.z);
         // The projectile centre starts on the drawn shaft as the string releases.
         const side=-1.15,forward=5.0,cos=Math.cos(r.yaw),sin=Math.sin(r.yaw);
         this.shots.push({x:r.x+side*cos+forward*sin,y:r.z+forward*cos-side*sin,tx:target.x,ty:target.y,type:"ranger",ttl:.36,max:.36});
@@ -203,9 +223,7 @@
     step(dt){
       if(this.paused||this.phase!=="fight")return;
       this.time+=dt;this.spawnIn-=dt;this.bannerTime=Math.max(0,this.bannerTime-dt);
-      for(const t of this.towers)if(t)t.kick=Math.max(0,(t.kick||0)-dt);
-      for(const f of this.floaters)f.ttl-=dt;this.floaters=this.floaters.filter(f=>f.ttl>0);
-      for(const p of this.impacts)p.ttl-=dt;this.impacts=this.impacts.filter(p=>p.ttl>0);
+      this.tickEffects(dt);
       if(this.queue.length&&this.spawnIn<=0){
         const type=this.queue.shift(),u=units[type],hp=Math.round(u.hp*(this.stage?.hp||1)*(1+(this.wave-1)*.215));
         this.enemies.push({id:++this.serial,type,hp,maxHp:hp,d:0,slow:0,frozen:0,...this.point(0)});
@@ -233,12 +251,12 @@
       this.enemies=this.enemies.filter(e=>{
         if(e.hp<=0){this.kills++;this.defeated++;this.gold+=units[e.type].bounty;this.volleyCharge=Math.min(100,this.volleyCharge+9);
           this.combo=this.time<=this.comboUntil?this.combo+1:1;this.comboUntil=this.time+2;this.bestCombo=Math.max(this.bestCombo,this.combo);
-          this.floaters.push({x:e.x,z:e.y,text:"+"+units[e.type].bounty,ttl:.85});if(this.floaters.length>24)this.floaters.shift();
-          this.burst(e.x,e.y-4,"#edd687",e.type==="boss"?20:7);this.impact(e.x,e.y,"#ffe9a3",e.type==="boss"?32:9);this.onEvent("kill",e.type);return false}
+          const near=this.floaters.find(f=>f.kind==="gold"&&f.ttl>.85&&Math.hypot(f.x-e.x,f.z-e.y)<18);
+          if(near){near.amount+=units[e.type].bounty;near.text="+"+near.amount;near.ttl=1.05}else this.floaters.push({x:e.x,z:e.y,text:"+"+units[e.type].bounty,amount:units[e.type].bounty,kind:"gold",ttl:1.05,max:1.05});if(this.floaters.length>32)this.floaters.shift();
+          const life=e.type==="boss"?.95:.55;this.deaths.push({type:e.type,x:e.x,z:e.y,yaw:e.yaw||0,phase:(e.d||0)/(e.type==="runner"?16:12)+(e.id||0)*.13,ttl:life,max:life});if(this.deaths.length>20)this.deaths.shift();
+          this.burst(e.x,e.y-4,"#edd687",e.type==="boss"?28:12);this.impact(e.x,e.y,"#ffe9a3",e.type==="boss"?35:12,"death");this.onEvent("kill",e.type);return false}
         if(e.d>=this.length){this.defeated++;this.health=Math.max(0,this.health-units[e.type].leak);this.onEvent("leak");return false}return true;
       });
-      for(const p of this.particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.ttl-=dt}this.particles=this.particles.filter(p=>p.ttl>0);
-      for(const s of this.shots)s.ttl-=dt;this.shots=this.shots.filter(s=>s.ttl>0);
       if(this.health<=0){this.phase="lost";this.onEvent("lost")}
       else if(!this.enemies.length&&!this.queue.length){
         const before=this.camp.people,gate=this.health;
@@ -247,7 +265,7 @@
           this.health=Math.min(20,this.health+this.camp.level-1);
         }
         this.camp.shortfall=0;
-        this.shots=[];this.particles=[];this.impacts=[];this.floaters=[];for(const t of this.towers)if(t)t.kick=0;this.phase=this.wave===this.waves.length?"won":"ready";
+        this.phase=this.wave===this.waves.length?"won":"ready";
         if(this.phase==="ready")this.gold+=waveReward(this.wave);
         this.onEvent(this.phase==="won"?"won":"cleared",{rescued:this.camp.people-before,repaired:this.health-gate});
       }

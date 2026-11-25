@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict');global.window=global;
+require('../campaign.js');require('../opening.js');require('../engine.js');
+const s=PineCampaign.chapters[0],g=new PineGame.Battle(s.path,s.pads,()=>{},s);
+g.phase='fight';g.queue=[];g.enemies=[{id:1,type:'scout',hp:100,maxHp:100,d:100,slow:0,frozen:0,...g.point(100)},{id:2,type:'runner',hp:100,maxHp:100,d:100,slow:0,frozen:0,...g.point(100)}];
+const index=g.pads.length;g.pads.push([g.enemies[0].x-10,g.enemies[0].y-10]);g.towers.push({type:'cannon',level:1,cd:100,spent:90});
+const beforeD=g.enemies[0].d;g.fire(index,g.towers[index],g.enemies[0],PineGame.levelStats('cannon',1));
+assert.equal(g.enemies[0].hp,69);assert.equal(g.enemies[1].hp,81.4);assert.equal(g.enemies[0].d,beforeD);assert.equal(g.enemies[0].flash,.22);assert(g.enemies[1].flash>0);assert(g.impacts.some(p=>p.kind==='blast'));assert(g.floaters.some(p=>p.kind==='damage'));assert(g.towers[index].kick>0);
+g.enemies.forEach(e=>e.hp=0);const gold=g.gold;g.step(.025);assert.equal(g.phase,'ready');assert.equal(g.gold,gold+3+5+PineGame.waveReward(0));assert.equal(g.deaths.length,2);assert(g.hasEffects);const payout=g.gold;
+for(let i=0;i<60;i++)g.tickEffects(.025);assert(!g.hasEffects);assert.equal(g.gold,payout);assert.equal(g.kills,2);
+for(let i=0;i<100;i++){g.impact(100,100,'#ffffff',22,'blast');g.burst(100,100,'#ffffff',12)}assert(g.impacts.length<=40);assert(g.particles.length<=160);g.reset();assert(!g.hasEffects);assert.equal(g.deaths.length,0);
+console.log('Cannon damage unchanged; AoE hit feedback, bounded effects, visible final kill, effect cleanup and no double payout passed.');

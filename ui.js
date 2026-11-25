@@ -220,7 +220,7 @@
     dirty=true;if(e==="landClear"){refreshTerrain();sound.play("build")}if(e==="shot"){sound.play(type);return}
     if(e==="volley"){feedback.flashUntil=performance.now()+180;feedback.cue("流星箭雨",g.mastery.banner?"全场压制 · 破阵战旗已展开":"全场压制 · 击杀敌人可再次充能");sound.play("volley")}
     if(e==="boss"||e==="rage"){feedback.cue(e==="rage"?"督军狂暴！":"碎岩督军登场",e==="rage"?"移速提高 · 六只疾狼正在驰援":"半血时会狂暴，留好箭雨应对援军");sound.play("boss")}
-    if(e==="kill")sound.play(type==="boss"?"won":"kill");
+    if(e==="kill")sound.play(type==="boss"?"bossfall":"kill");
     if(e==="start"&&stage.opening)feedback.cue(stage.opening.names[g.wave-1],stage.opening.hints[g.wave-1]);
     if(e==="sell"){selected=hover=null;manageKey=""}
     if(["build","sell","salvage"].includes(e))installPads();
@@ -277,6 +277,7 @@
   function draw(){renderer.render(g,selected,choice,hover);drawBuildGrid();feedback.draw(g,renderer);const key=[renderer.w,renderer.h,renderer.angle,renderer.pitch,renderer.zoom,renderer.viewHeight,profile.chapter,...g.towers.map(t=>!!t),...g.supplyHealth.map(Boolean)].join();if(key!==lastProjection){lastProjection=key;pads.forEach((b,i)=>{if(!b)return;const [x,z]=g.pads[i],t=g.towers[i],[px,py,depth]=renderer.project(x,g.supplyHealth[i-g.baseSites]?7:t?12:3,z);b.hidden=(!t&&!g.supplyHealth[i-g.baseSites])||px<0||px>renderer.w||py<0||py>renderer.h;b.style.left=px/renderer.w*100+"%";b.style.top=py/renderer.h*100+"%";b.style.zIndex=String(Math.round(300+depth));b.style.height=t?"9%":"6.3%"})}dirty=false}
   function animate(now){const dt=stamp?Math.min(.15,(now-stamp)/1000):0;stamp=now;const active=g.phase==="fight"&&!modal&&!g.paused&&!document.hidden;
     if(active){clock+=dt*g.speed;while(clock>=1/40){g.step(1/40);clock-=1/40}if(now-uiAt>180){update();uiAt=now}if(now-saveAt>1500){save();saveAt=now}}
+    else if(!document.hidden&&!g.paused&&g.phase!=="fight"&&g.hasEffects){g.tickEffects(dt);dirty=true}
     if((active||dirty||renderer.dirty)&&now-paintAt>(renderer.gl?25:65)){draw();paintAt=now}
     if(modal==="models")studio?.tick(now,dt);
     else if(!modal&&portraitVisible&&!document.hidden){const frame=Math.floor(now/380)%8;if(frame!==portraitFrame||portraitSkin!==profile.skin){rangerView.specimen("ranger",profile.skin,"idle",frame/8,0,true);portraitFrame=frame;portraitSkin=profile.skin}}

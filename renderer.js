@@ -60,11 +60,12 @@
       this.gl=gl;if(gl)this.initGL();else{this.ctx=canvas.getContext("2d");this.softwareCache=null}
     }
     initGL(){
-      const gl=this.gl,p=gl.createProgram();for(const [type,src] of [[gl.VERTEX_SHADER,`attribute vec3 pos;attribute vec3 color;uniform vec4 view;uniform vec3 scale;uniform vec3 center;uniform vec4 model;varying vec3 tint;
-        void main(){float ca=view.x,sa=view.y,cp=view.z,sp=view.w;float cs=cos(model.w),sn=sin(model.w);vec3 q=vec3(pos.x*cs+pos.z*sn,pos.y,pos.z*cs-pos.x*sn)+model.xyz-center;
-        float front=q.x*sa+q.z*ca;float depth=front*cp+q.y*sp;gl_Position=vec4((q.x*ca-q.z*sa)*scale.x,(q.y*cp-front*sp)*scale.y+scale.z,-depth/650.,1.);tint=color;}`],[gl.FRAGMENT_SHADER,`precision mediump float; varying vec3 tint;void main(){gl_FragColor=vec4(tint,1.);}`]]){
+      const gl=this.gl,p=gl.createProgram();for(const [type,src] of [[gl.VERTEX_SHADER,`attribute vec3 pos;attribute vec3 color;uniform vec4 view;uniform vec3 scale;uniform vec3 center;uniform vec4 model;uniform mediump vec3 appearance;varying vec3 tint;
+        void main(){float ca=view.x,sa=view.y,cp=view.z,sp=view.w;float cs=cos(model.w),sn=sin(model.w);vec3 q=vec3(pos.x*cs+pos.z*sn,pos.y,pos.z*cs-pos.x*sn)*appearance.x+model.xyz-center;
+        float front=q.x*sa+q.z*ca;float depth=front*cp+q.y*sp;gl_Position=vec4((q.x*ca-q.z*sa)*scale.x,(q.y*cp-front*sp)*scale.y+scale.z,-depth/650.,1.);tint=mix(color,vec3(1.,.93,.80),appearance.y);}`],[gl.FRAGMENT_SHADER,`precision mediump float;uniform mediump vec3 appearance;varying vec3 tint;void main(){gl_FragColor=vec4(tint,appearance.z);}`]]){
           const sh=gl.createShader(type);gl.shaderSource(sh,src);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(sh));gl.attachShader(p,sh);gl.deleteShader(sh)}
       gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));gl.useProgram(p);
+      this.appearanceU=gl.getUniformLocation(p,"appearance");
       this.pos=gl.getAttribLocation(p,"pos");this.col=gl.getAttribLocation(p,"color");this.viewU=gl.getUniformLocation(p,"view");this.scaleU=gl.getUniformLocation(p,"scale");this.modelU=gl.getUniformLocation(p,"model");this.centerU=gl.getUniformLocation(p,"center");gl.enableVertexAttribArray(this.pos);gl.enableVertexAttribArray(this.col);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.clearColor(0,0,0,0);
     }
     data(mesh,dynamic=false){
@@ -116,26 +117,31 @@
       const front=((py-this.h*this.offset)/this.scale-this.center[1]*this.cp)/this.sp;
       return [this.center[0]+side*this.ca+front*this.sa,this.center[2]-side*this.sa+front*this.ca];
     }
-    drawData(data,x=0,y=0,z=0,yaw=0){
+    drawData(data,x=0,y=0,z=0,yaw=0,size=1,flash=0,alpha=1){
       if(!data)return;
       if(this.gl){const gl=this.gl,b=data.stride*4;
         gl.bindBuffer(gl.ARRAY_BUFFER,data.buf);gl.vertexAttribPointer(this.pos,3,gl.FLOAT,false,b,0);gl.vertexAttribPointer(this.col,3,gl.FLOAT,false,b,12);
-        gl.uniform4f(this.modelU,x,y,z,yaw);gl.drawArrays(gl.TRIANGLES,0,data.count);
-      }else this.raster(data.vertices,x,y,z,yaw,data.stride);
+        gl.uniform4f(this.modelU,x,y,z,yaw);gl.uniform3f(this.appearanceU,size,flash,alpha);
+        if(alpha<1){gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false)}
+        gl.drawArrays(gl.TRIANGLES,0,data.count);
+        if(alpha<1){gl.disable(gl.BLEND);gl.depthMask(true)}
+      }else this.raster(data.vertices,x,y,z,yaw,data.stride,size,flash,alpha);
     }
     // A depth-tested software path also works on machines where WebGL is disabled.
-    raster(v,ox,oy,oz,yaw,stride){
+    raster(v,ox,oy,oz,yaw,stride,size=1,flash=0,alpha=1){
       const w=this.w,h=this.h,s=Math.sin(yaw),c=Math.cos(yaw),rgba=this.pixels,depth=this.depth;
       for(let n=0;n<v.length;n+=stride*3){const pts=[];
-        for(let i=n;i<n+stride*3;i+=stride)pts.push(this.project(v[i]*c+v[i+2]*s+ox,v[i+1]+oy,v[i+2]*c-v[i]*s+oz));
+        for(let i=n;i<n+stride*3;i+=stride)pts.push(this.project((v[i]*c+v[i+2]*s)*size+ox,v[i+1]*size+oy,(v[i+2]*c-v[i]*s)*size+oz));
         const [a,b,d]=pts,den=(b[1]-d[1])*(a[0]-d[0])+(d[0]-b[0])*(a[1]-d[1]);if(Math.abs(den)<.001)continue;
         const color=(255<<24)|(Math.round(v[n+5]*255)<<16)|(Math.round(v[n+4]*255)<<8)|Math.round(v[n+3]*255);
         const l=Math.max(0,Math.ceil(Math.min(a[0],b[0],d[0]))),r=Math.min(w-1,Math.floor(Math.max(a[0],b[0],d[0]))),top=Math.max(0,Math.ceil(Math.min(a[1],b[1],d[1]))),bottom=Math.min(h-1,Math.floor(Math.max(a[1],b[1],d[1])));
-        for(let j=top;j<=bottom;j++)for(let i=l;i<=r;i++){const u=((b[1]-d[1])*(i-d[0])+(d[0]-b[0])*(j-d[1]))/den,vv=((d[1]-a[1])*(i-d[0])+(a[0]-d[0])*(j-d[1]))/den,t=1-u-vv;if(u<0||vv<0||t<0)continue;const z=a[2]*u+b[2]*vv+d[2]*t,k=j*w+i;if(z<depth[k])continue;depth[k]=z;
+        for(let j=top;j<=bottom;j++)for(let i=l;i<=r;i++){const u=((b[1]-d[1])*(i-d[0])+(d[0]-b[0])*(j-d[1]))/den,vv=((d[1]-a[1])*(i-d[0])+(a[0]-d[0])*(j-d[1]))/den,t=1-u-vv;if(u<0||vv<0||t<0)continue;const z=a[2]*u+b[2]*vv+d[2]*t,k=j*w+i;if(z<depth[k])continue;if(alpha===1)depth[k]=z;const background=rgba[k];
           if(v[n+3]!==v[n+stride+3]||v[n+3]!==v[n+2*stride+3]||v[n+4]!==v[n+stride+4]||v[n+4]!==v[n+2*stride+4]||v[n+5]!==v[n+stride+5]||v[n+5]!==v[n+2*stride+5]){
             const a=n+3,b=n+stride+3,c=n+2*stride+3;
             rgba[k]=0xff000000|((255*(v[a+2]*u+v[b+2]*vv+v[c+2]*t))<<16)|((255*(v[a+1]*u+v[b+1]*vv+v[c+1]*t))<<8)|(255*(v[a]*u+v[b]*vv+v[c]*t));
-          }else rgba[k]=color}
+          }else rgba[k]=color;
+          if(flash||alpha<1){const pixel=rgba[k];let mixed=0xff000000;for(let channel=0;channel<3;channel++){const shift=channel*8,base=(pixel>>>shift)&255,lit=base*(1-flash)+[255,237,204][channel]*flash;mixed|=Math.round(lit*alpha+((background>>>shift)&255)*(1-alpha))<<shift}rgba[k]=mixed}
+        }
       }
     }
     model(key,build){if(!this.models.has(key)){if(this.models.size>=75){const oldest=this.models.keys().next().value;this.release(this.models.get(oldest));this.models.delete(oldest)}const m=new Mesh();build(m);this.models.set(key,this.data(m))}return this.models.get(key)}
@@ -196,17 +202,19 @@
         if(g.markedSupply===j)effect.ring(c.x,c.z,12,3,"#ffda75",2);
       });
       g.towers.forEach((t,i)=>{if(!t)return;const [x,z]=g.pads[i],key=[t.type,t.level,this.skin].join("/");
-        this.drawData(this.model(key,m=>PineFigures.tower(m,t.type,0,0,t.level,this.skin)),x,1.4+(t.kick||0)*5,z,t.yaw||0)});
+        this.drawData(this.model(key,m=>PineFigures.tower(m,t.type,0,0,t.level,this.skin)),x,1.4+(t.kick||0)*5,z,t.yaw||0);
+        if(t.type==="cannon"&&t.kick>.12){const yaw=t.yaw||0,px=x+Math.sin(yaw)*10,pz=z+Math.cos(yaw)*10;effect.frustum(px,22,pz,3.4,0,6,6,"#ffe9ae");effect.box(px,23,pz,2,2,9,"#fff4c8",yaw)}
+      });
       const r=g.ranger,aiming=g.phase==="fight"&&(r.target!==null||r.released);
       this.drawData(this.character("ranger",aiming?"shoot":"idle",aiming?r.cycle:g.time*.33,this.skin,false,aiming),r.x,1,r.z,r.yaw);
       for(const e of g.enemies){
-        const frozen=e.frozen>0||e.slow>0,phase=e.frozen>0?0:e.d/(e.type==="runner"?16:12)+e.id*.13;
-        this.drawData(this.character(e.type,"walk",phase,this.skin,frozen),e.x,1,e.y,e.yaw);
-        if(e.flash>0)effect.ring(e.x,e.y,7,2,"#fff3cd",2);
+        const frozen=e.frozen>0||e.slow>0,hit=Math.max(0,(e.flash||0)/.22),recoil=Math.sin(hit*Math.PI),pose=hit>.5?(e.hitPose??e.d):e.d,phase=e.frozen>0?0:pose/(e.type==="runner"?16:12)+e.id*.13;
+        this.drawData(this.character(e.type,"walk",phase,this.skin,frozen),e.x+(e.recoilX||0)*recoil,1+recoil*.8,e.y+(e.recoilZ||0)*recoil,e.yaw,1,Math.min(.9,hit*1.2));
         if(e.enraged)effect.ring(e.x,e.y,14,2,"#ff8150",2.2);
         if(e.hp<e.maxHp){const h=e.type==="boss"?30:e.type==="brute"?21:18,frac=Math.max(0,e.hp/e.maxHp),ang=-this.angle;
           effect.box(e.x,h,e.y,13,1.6,1.1,"#3b3236",ang);if(frac>0)effect.box(e.x+(frac-1)*6*this.ca,h+.15,e.y-(frac-1)*6*this.sa,12*frac,1.7,1.4,frozen?"#a9f8ff":"#e5cf82",ang)}
       }
+      for(const d of g.deaths||[]){const f=1-d.ttl/d.max;this.drawData(this.character(d.type,"walk",d.phase,this.skin),d.x,1+Math.sin(f*Math.PI)*3,d.z,d.yaw+f*.6,Math.max(.12,1-f*.85),Math.max(0,1-f*4),Math.max(0,1-f))}
       for(const s of g.shots){const f=1-s.ttl/s.max,x=s.x+(s.tx-s.x)*f,z=s.y+(s.ty-s.y)*f,y=s.type==="volley"?55*(1-f)+3:25+(6-25)*f+(s.type==="cannon"?13:2)*Math.sin(f*Math.PI);const arrow=s.type==="arrow"||s.type==="ranger"||s.type==="ballista"||s.type==="volley";if(s.type==="storm"){const dx=s.tx-s.x,dz=s.ty-s.y;for(let i=0;i<6;i++){const a=i/6,b=(i+1)/6,j=i%2?1.5:-1.5;effect.box(s.x+dx*(a+b)/2+j,(s.arc?8:23)+(8-(s.arc?8:23))*(a+b)/2,s.y+dz*(a+b)/2,1,1,Math.hypot(dx,dz)/6+1,"#d5bcff",Math.atan2(dx,dz))}continue}effect.box(x,y,z,arrow?.8:2,arrow?.8:2,arrow?9:3,s.type==="venom"?"#9ae453":s.type==="frost"?"#b8ffff":arrow?"#ffe4a3":"#352c29",Math.atan2(s.tx-s.x,s.ty-s.y))}
       for(const p of g.impacts||[]){const f=1-p.ttl/p.max;effect.ring(p.x,p.z,Math.max(1,p.size*f),2.8,p.color,Math.max(.4,2*(1-f)))}
       for(const p of g.particles){const size=Math.max(.3,p.ttl*4);effect.box(p.x,3+p.ttl*12,p.y,size,size,size,p.color)}
