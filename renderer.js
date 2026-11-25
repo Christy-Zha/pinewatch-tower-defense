@@ -205,7 +205,7 @@
           effect.box(e.x,h,e.y,13,1.6,1.1,"#3b3236",ang);if(frac>0)effect.box(e.x+(frac-1)*6*this.ca,h+.15,e.y-(frac-1)*6*this.sa,12*frac,1.7,1.4,frozen?"#a9f8ff":"#e5cf82",ang)}
       }
       for(const s of g.shots){const f=1-s.ttl/s.max,x=s.x+(s.tx-s.x)*f,z=s.y+(s.ty-s.y)*f,y=25+(6-25)*f+(s.type==="cannon"?13:2)*Math.sin(f*Math.PI);const arrow=s.type==="arrow"||s.type==="ranger"||s.type==="ballista";if(s.type==="storm"){const dx=s.tx-s.x,dz=s.ty-s.y;for(let i=0;i<6;i++){const a=i/6,b=(i+1)/6,j=i%2?1.5:-1.5;effect.box(s.x+dx*(a+b)/2+j,(s.arc?8:23)+(8-(s.arc?8:23))*(a+b)/2,s.y+dz*(a+b)/2,1,1,Math.hypot(dx,dz)/6+1,"#d5bcff",Math.atan2(dx,dz))}continue}effect.box(x,y,z,arrow?.55:2,arrow?.55:2,arrow?7:3,s.type==="venom"?"#9ae453":s.type==="frost"?"#b8ffff":arrow?"#ffe4a3":"#352c29",Math.atan2(s.tx-s.x,s.ty-s.y))}
-      const active=hover??selected;if(active!=null&&!g.ended){const t=g.towers[active]||{type:choice,level:1},[x,z]=g.pads[active];effect.ring(x,z,PineGame.levelStats(t.type,t.level).range,2.6,"#ffe39d",1.6)}
+      const active=selected??hover;if(active!=null&&g.towers[active]&&!g.ended){const t=g.towers[active],[x,z]=g.pads[active];effect.ring(x,z,PineGame.levelStats(t.type,t.level).range,2.6,"#ffe39d",2)}
       if(effect.vertices.length){const data=this.data(effect,true);this.drawData(data);this.release(data)}
       this.finish();
     }

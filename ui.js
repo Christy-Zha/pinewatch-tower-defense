@@ -73,6 +73,7 @@
   const gridContext=gridCanvas.getContext("2d");
   function setBuildGrid(on){
     gridVisible=on&&!g.ended;gridCanvas.hidden=!gridVisible;
+    if(gridVisible){selected=hover=null;manageKey="";update()}
     if(!gridVisible)gridSelection=null;
     $("grid-toggle").textContent=gridVisible?"收起网格":"布防";
     $("grid-toggle").setAttribute("aria-pressed",String(gridVisible));
@@ -107,11 +108,14 @@
   function siteOrders(i,point=null){
     pendingSite=point;dirty=true;
     const tower=g.towers[i];
-    dialog("site",point?"网格建造 · "+g.gold+" 军费":"防御塔管理",tower?towers[tower.type].name+" · "+tower.level+" 级":"选择防御塔",'<div class="site-choices"></div>');
+    selected=tower?i:null;hover=null;manageKey="";
+    if(tower)setBuildGrid(false);
+    const range=tower?levelStats(tower.type,tower.level).range:null;
+    dialog("site",point?"网格建造 · "+g.gold+" 军费":"防御塔管理",tower?towers[tower.type].name+" · "+tower.level+" 级":"选择防御塔",'<div class="site-choices"></div>'+(tower?'<p class="tower-range">攻击范围：金色圆圈内 · 射程 '+range+(tower.level<3?' → 升级后 '+levelStats(tower.type,tower.level+1).range:' · 已满级')+'</p>':''));
     const list=$("dialog-body").firstElementChild;
     if(tower){
       const cost=upgradeCost(tower);
-      const improve=btn(tower.level===3?"已达最高等级":"升级 · "+cost+" 军费","primary",()=>{if(g.upgrade(i))closeDialog()});
+      const improve=btn(tower.level===3?"已达最高等级":"升级 · "+cost+" 军费","primary",()=>{if(g.upgrade(i)){closeDialog();msg("防御塔已升级 · 射程 "+levelStats(tower.type,tower.level).range)}});
       improve.disabled=tower.level>=3||g.gold<cost;
       list.append(improve,btn("拆除 · 回收 "+Math.floor(tower.spent*.65)+" 军费","secondary",()=>{if(g.sell(i))closeDialog()}));
     }else for(const [type,t] of Object.entries(towers)){
@@ -206,6 +210,7 @@
   }
   function onEvent(e,type){
     dirty=true;if(e==="landClear"){refreshTerrain();sound.play("build")}if(e==="shot"){sound.play(type);return}
+    if(e==="sell"){selected=hover=null;manageKey=""}
     if(["build","sell","salvage"].includes(e))installPads();
     if(e==="won"||e==="lost"||e==="start")setBuildGrid(false);
     if(["build","upgrade","start","cleared","leak","won","lost"].includes(e))sound.play(e);
@@ -266,6 +271,7 @@
   const touches=new Map(),area=$("map-area");
   area.addEventListener("click",e=>{
     if(g.ended||modal||performance.now()<blockClick||e.target.closest("button,.camera-bar,.scene-meta"))return;
+    selected=hover=null;manageKey="";dirty=true;update();
     const pos=PineRenderer.inputPoint(e),rect=$("field").getBoundingClientRect(),sideways=document.documentElement.classList.contains("sideways-battle");
     const px=(pos.x-(sideways?rect.top:rect.left))*renderer.dpr,py=(pos.y-(sideways?innerWidth-rect.right:rect.top))*renderer.dpr;
     const [fx,fz]=g.furnaceSite,[fireX,fireY]=renderer.project(fx,6,fz);
