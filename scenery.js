@@ -467,15 +467,6 @@
         }
       }
     }
-    // Octagonal engraved foundations and inlaid build markers.
-    for(const [x,z] of padPoints){
-      shadow(x+.8,z+1.3,9.7,8.6);
-      solid(x,.13,z,9.15,9.25,1.07,8,B(stone,.37),Math.PI/8);
-      solid(x,1.19,z,9.2,8.25,1.1,8,blend(stone,P.soil,.16),Math.PI/8);
-      solid(x,2.29,z,7.43,7.35,.23,8,B(stone,.19),Math.PI/8);
-      solid(x,2.53,z,6.87,6.80,.16,8,blend(stone,P.grass,.16),Math.PI/8);
-      for(const [w,d] of [[7.3,1.67],[1.67,7.3]])box(x,2.83,z,w,.36,d,'#eddeb5');
-    }
     return {props,landError(x,z){
       if(x<x0+10||x>x1-10||z<z0+10||z>z1-10)return "请在战场边界内选址";
       if(distance(x,z,trail)<trailW+8)return "这里是行军道路，请点路旁的空地";

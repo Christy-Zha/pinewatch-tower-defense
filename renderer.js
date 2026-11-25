@@ -183,7 +183,6 @@
           effect.box(x,height,z,.65,.95,1.8,"#e1eef0",.75);
         }
       }
-      if(this.buildPreview)effect.ring(this.buildPreview[0],this.buildPreview[1],9,1.3,"#ffe29b",1.8);
       g.supplies.forEach((c,j)=>{
         if(!g.supplyHealth[j])return;
         this.drawData(this.model("supply/"+j,m=>{

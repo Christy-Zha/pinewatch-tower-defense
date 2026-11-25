@@ -72,7 +72,8 @@
 
   document.addEventListener('keydown',event=>{
     if(inBattleView()&&!dialog.open&&event.key==='Escape'){
-      event.preventDefault();event.stopImmediatePropagation();setExpanded(false);
+      event.preventDefault();event.stopImmediatePropagation();
+      if(document.getElementById('grid-toggle').getAttribute('aria-pressed')==='true')window.dispatchEvent(new Event('pine-grid-dismiss'));else setExpanded(false);
     }
   },true);
   document.getElementById('pad-controls').addEventListener('click',event=>{

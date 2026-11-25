@@ -23,6 +23,15 @@
   const upgradeCost=t=>Math.round(towers[t.type].cost*(t.level===1?.8:1.2));
   const waveReward=wave=>15+wave*2;
   const newCamp=()=>({wood:9,stone:0,people:3,loggers:2,level:1,shortfall:0});
+  const buildGrid={size:22,x:30,z:36,columns:20,rows:10};
+  const gridCells=Array.from({length:buildGrid.columns*buildGrid.rows},(_,i)=>({
+    x:buildGrid.x+(i%buildGrid.columns)*buildGrid.size,
+    z:buildGrid.z+Math.floor(i/buildGrid.columns)*buildGrid.size
+  }));
+  function snapSite(x,z){
+    return [buildGrid.x+Math.round((x-buildGrid.x)/buildGrid.size)*buildGrid.size,
+      buildGrid.z+Math.round((z-buildGrid.z)/buildGrid.size)*buildGrid.size];
+  }
   function arrowDamage(enemy,damage){
     const armored=enemy.type==="brute"||enemy.type==="boss";
     return armored&&!enemy.slow&&!enemy.frozen?damage*.45:damage;
@@ -35,7 +44,7 @@
       const post=this.point(Math.min(67,this.length*.12));
       this.post=stage?.post||[post.x+Math.cos(post.yaw)*13,post.y-Math.sin(post.yaw)*13];this.reset();
     }
-    reset(){this.camp=newCamp();this.cleared=new Set();this.pads.length=this.fixedSites;this.supplyHealth=this.supplies.map(c=>c.hp);this.markedSupply=null;this.gold=this.stage?.gold??180;this.health=20;this.wave=0;this.kills=0;this.phase="ready";this.paused=false;this.speed=1;this.towers=this.pads.map(()=>null);this.enemies=[];this.shots=[];this.particles=[];this.queue=[];this.spawnIn=0;this.time=0;this.defeated=0;this.serial=0;this.waveSize=0;this.ranger={x:this.post[0],z:this.post[1],yaw:-.25,target:null,cycle:0,released:false}}
+    reset(){this.camp=newCamp();this.cleared=new Set();this.pads.length=this.fixedSites;this.supplyHealth=this.supplies.map(c=>c.hp);this.markedSupply=null;this.gold=(this.stage?.gold??180)+60;this.health=20;this.wave=0;this.kills=0;this.phase="ready";this.paused=false;this.speed=1;this.towers=this.pads.map(()=>null);this.enemies=[];this.shots=[];this.particles=[];this.queue=[];this.spawnIn=0;this.time=0;this.defeated=0;this.serial=0;this.waveSize=0;this.ranger={x:this.post[0],z:this.post[1],yaw:-.25,target:null,cycle:0,released:false}}
     get ended(){return this.phase==="won"||this.phase==="lost"}
     get fixedSites(){return this.baseSites+this.supplies.length}
     campForecast(wave){
@@ -61,6 +70,10 @@
     }
     placementError(x,z){
       if(!Number.isFinite(x)||!Number.isFinite(z)||!this.terrain)return "请选择战场空地";
+      if(x<buildGrid.x||x>buildGrid.x+(buildGrid.columns-1)*buildGrid.size||
+          z<buildGrid.z||z>buildGrid.z+(buildGrid.rows-1)*buildGrid.size)return "请选择网格内的空地";
+      const [gx,gz]=snapSite(x,z);
+      if(Math.abs(x-gx)>.01||Math.abs(z-gz)>.01)return "请选择网格中心";
       const blocked=this.terrain.landError(x,z);
       if(blocked)return blocked;
       if(this.terrain.props.some(p=>!this.cleared.has(p.id)&&Math.hypot(x-p.x,z-p.z)<p.r+7))return "先清除这里的树木或石块";
@@ -68,6 +81,7 @@
       return "";
     }
     buildAt(x,z,type){
+      [x,z]=snapSite(x,z);
       if(this.ended||!towers[type]||this.gold<towers[type].cost||this.placementError(x,z))return false;
       let i=this.towers.findIndex((t,n)=>n>=this.fixedSites&&!t);
       if(i<0)i=this.pads.length;
@@ -86,7 +100,7 @@
       this.markedSupply=this.markedSupply===j?null:j;return true;
     }
     point(d){const s=this.sections.find(v=>d<v.start+v.len)||this.sections[this.sections.length-1];const t=Math.max(0,Math.min(1,(d-s.start)/s.len));return {x:s.a[0]+(s.b[0]-s.a[0])*t,y:s.a[1]+(s.b[1]-s.a[1])*t,yaw:Math.atan2(s.b[0]-s.a[0],s.b[1]-s.a[1])}}
-    build(i,type){const t=towers[type];if(this.ended||!t||!this.pads[i]||this.supplyHealth[i-this.baseSites]>0||this.towers[i]||this.towers.some((other,n)=>other&&Math.hypot(this.pads[n][0]-this.pads[i][0],this.pads[n][1]-this.pads[i][1])<17)||this.gold<t.cost)return false;this.gold-=t.cost;this.towers[i]={type,level:1,spent:t.cost,cd:0};this.onEvent("build");return true}
+    build(i,type){const t=towers[type];if(this.ended||!t||!this.pads[i]||this.supplyHealth[i-this.baseSites]>0||this.towers[i]||this.towers.some((other,n)=>other&&Math.hypot(this.pads[n][0]-this.pads[i][0],this.pads[n][1]-this.pads[i][1])<17)||this.gold<t.cost||(this.terrain&&this.placementError(...this.pads[i])))return false;this.gold-=t.cost;this.towers[i]={type,level:1,spent:t.cost,cd:0};this.onEvent("build");return true}
     upgrade(i){const t=this.towers[i];if(this.ended||!t||t.level>=3||this.gold<upgradeCost(t))return false;const cost=upgradeCost(t);this.gold-=cost;t.spent+=cost;t.level++;this.onEvent("upgrade");return true}
     sell(i){const t=this.towers[i];if(this.ended||!t)return false;this.gold+=Math.floor(t.spent*.65);this.towers[i]=null;this.onEvent("sell");return true}
     start(){
@@ -205,5 +219,5 @@
       }
     }
   }
-  window.PineGame={Battle,towers,units,waves,levelStats,upgradeCost,waveReward,newCamp};
+  window.PineGame={Battle,towers,units,waves,levelStats,upgradeCost,waveReward,newCamp,buildGrid,gridCells,snapSite};
 })();

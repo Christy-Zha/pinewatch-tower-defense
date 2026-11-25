@@ -217,3 +217,11 @@ html.sideways-battle .map-area.show-tools .camera-bar {bottom:55px;right:max(8px
 .camp-jobs,.camp-upgrade {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
 .camp-upgrade {margin-top:8px}.camp-upgrade span {font-size:12px}
 #camp-shifts {display:flex;gap:5px}#camp-shifts button,#camp-forge button {min-height:40px}
+#build-grid {position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+#build-grid[hidden] {display:none}
+#grid-toggle {pointer-events:auto;touch-action:manipulation;min-height:32px;padding:4px 9px;border:1px solid #95a078;border-radius:6px;background:#20382bef;color:#efdfae;font:600 12px system-ui;cursor:pointer}
+#grid-toggle[aria-pressed=true] {background:#e0c27d;color:#243025;border-color:#ffe3a2}
+html.battle-expanded #grid-toggle {height:44px}
+html.battle-expanded .camera-bar {right:calc(177px + var(--battle-r,env(safe-area-inset-right)))}
+html.phone-battle .phone-tools {right:calc(167px + var(--battle-r,env(safe-area-inset-right)))}
+html.phone-battle .map-area.show-tools .camera-bar {right:max(8px,var(--battle-r,env(safe-area-inset-right)))}
